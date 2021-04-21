@@ -1,0 +1,5 @@
+{
+    "python.pythonPath": "/home/saboa/.pyenv/versions/mmskeleton/bin/python",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
+}
