@@ -36,17 +36,13 @@ class cnn_custom_2(nn.Module):
                  input_timesteps=120,
                  **kwargs):
         super().__init__()
-        print('In CNN custom: ', graph_cfg)
-        print('Additional kwargs: ', kwargs)
         # load graph
         self.graph = Graph(**graph_cfg)
         A = torch.tensor(
             self.graph.A, dtype=torch.float32, requires_grad=False)
         self.register_buffer('A', A)
 
-
         self.data_bn = nn.BatchNorm3d(1) if data_bn else lambda x: x
-
 
         self.temporal_kernel = temporal_kernel_size
         self.conv1_filters = 64
@@ -68,21 +64,14 @@ class cnn_custom_2(nn.Module):
         self.conv5 = nn.Conv1d(self.conv4_filters, self.conv5_filters, self.temporal_kernel)
 
         self.num_features_before_fc = (input_timesteps-4*(self.temporal_kernel-1)) * self.conv5_filters
-
-        # print(input_timesteps, self.temporal_kernel, self.conv4_filters)
-        # input(self.num_features_before_fc)
-
         self.fc1 = nn.Linear(self.num_features_before_fc, self.fc1_out)
         self.output_filters = self.fc1_out
 
-        # Move this to upper level
-        # self.fc2 = nn.Linear(self.fc1_out, 1)
-        # self.num_class = num_class
+
 
     def forward(self, x):
         # Reshape the input to be of size [bs, 1, timestamps, num_joints, num_coords] 
         x = x.permute(0, 4, 2, 3, 1).contiguous()
-        # x = self.data_bn(x)
 
         # 3d conv
         x = F.relu(self.conv1(x))
@@ -95,10 +84,7 @@ class cnn_custom_2(nn.Module):
         x = self.dropout(F.relu(self.conv5(x)))
 
         x = x.view(-1, self.num_features_before_fc)
-
         x = F.relu(self.fc1(x))
-        # x = F.relu(self.fc2(x))
-        # torch.clamp(x, min=-1, max=self.num_class)
 
         return x
 

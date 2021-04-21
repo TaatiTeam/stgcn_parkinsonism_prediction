@@ -9,14 +9,18 @@ model/*
 *.pt
 *.caffemodel
 cache/
-checkpoints/*
+mmskeleton/checkpoints/*
 save/*
 configs_private/
 wandb/*
 wandb_dryrun/*
 wandb-summary.json
+mmskeleton/wandb/*
+mmskeleton/wandb_dryrun/*
+mmskeleton/wandb-summary.json
+
 *.out
-mmskeleton/version.py
+mmskeleton/mmskeleton/version.py
 
 
 # Byte-compiled / optimized / DLL files
