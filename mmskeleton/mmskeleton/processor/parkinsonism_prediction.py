@@ -11,8 +11,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.metrics import mean_absolute_error, accuracy_score, confusion_matrix
 import wandb
 import matplotlib.pyplot as plt
-# from spacecutter.models import OrdinalLogisticModel
-# import spacecutter
+
 import pandas as pd
 import pickle
 import shutil
@@ -21,17 +20,18 @@ from mmskeleton.processor.supcon_loss import *
 import time
 import scipy
 
-turn_off_wd = True
-fast_dev = False
+# Globals
+turn_off_weight_decay = False       # Keep as False to use the configuration from the YAML file
 log_incrementally = True
 log_code = False
-log_conf_mat = False
-# os.environ['WANDB_MODE'] = 'dryrun'
+
+# When developing/testing, we can save time by only loading in a subset of the data
+fast_dev = False                    # Should be False to evaluate on entire dataset
 num_walks_in_fast = 100
 
 
 # Global variables
-num_class = 4
+num_class = 4                       # This is overwritten using the info in the YAML config file
 balance_classes = False
 class_weights_dict = {}
 flip_loss_mult = False
@@ -40,14 +40,9 @@ local_data_base = '/home/saboa/data/OBJECTIVE_2_ML_DATA/data'
 
 local_output_base = '/home/saboa/data/mmskel_out'
 local_long_term_base = '/home/saboa/data/mmskel_long_term'
-
 local_output_wandb = '/home/saboa/code/mmskeleton/wandb_dryrun'
-
 local_model_zoo_base = '/home/saboa/data/OBJECTIVE_2_ML_DATA/model_zoo'
-
-
 local_dataloader_temp = '/home/saboa/data/OBJECTIVE_2_ML_DATA/dataloaders'
-
 
 
 def eval(
@@ -65,7 +60,6 @@ def eval(
         workers=4,
         resume_from=None,
         load_from=None,
-        test_ids=None,
         cv=5,
         exclude_cv=False,
         notes=None,
@@ -73,7 +67,7 @@ def eval(
         flip_loss=0,
         weight_classes=False,
         group_notes='',
-        launch_from_local=False,
+        launch_from_local=True,
         wandb_project="mmskel",
         early_stopping=False,
         force_run_all_epochs=True,
@@ -85,91 +79,68 @@ def eval(
         head='stgcn',
         freeze_encoder=True,
         do_position_pretrain=True,
+        resource_root='.',
 ):
-    # Reproductibility
+    # Set seed for reproductibility
     set_seed(0)
     print("==================================")
     print('have cuda: ', torch.cuda.is_available())
     print('using device: ', torch.cuda.get_device_name())
     
-    global log_incrementally
-    if log_incrementally:
-        os.environ['WANDB_MODE'] = 'run'
-    else:
-        os.environ['WANDB_MODE'] = 'dryrun'
 
-    if log_code:
-        os.environ['WANDB_DISABLE_CODE'] = 'false'
-    else:
-        os.environ['WANDB_DISABLE_CODE'] = 'true'
-
-    # Set up for logging 
-    outcome_label = dataset_cfg[0]['data_source']['outcome_label']
-
-    eval_pipeline = setup_eval_pipeline(dataset_cfg[1]['pipeline'])
-
-    if turn_off_wd:
-        for stage in range(len(optimizer_cfg)):
-            optimizer_cfg[stage]['weight_decay'] = 0
-
-
+    # Update globals
     global flip_loss_mult
     flip_loss_mult = flip_loss
 
     global balance_classes
     balance_classes = weight_classes
 
-    # Add the wandb group to work_dir to prevent conflicts if running multiple repetitions of the same configuration
-
-    model_type = get_model_type(model_cfg)
-
-    group_notes = model_type + '_pretrain15' + "_dropout" + str(model_cfg['dropout']) + '_tempkernel' + str(model_cfg['temporal_kernel_size']) + "_batch" + str(batch_size)
+    global num_class
     num_class = model_cfg['num_class']
-    wandb_group = wandb.util.generate_id() + "_" + outcome_label + "_" + group_notes
+    
+    if turn_off_weight_decay:
+        for stage in range(len(optimizer_cfg)):
+            optimizer_cfg[stage]['weight_decay'] = 0
+
+    # Set up the name for WANDB logging and local work dir
+    outcome_label = dataset_cfg[0]['data_source']['outcome_label']
+    eval_pipeline = setup_eval_pipeline(dataset_cfg[1]['pipeline'])
+
+    if log_code:
+        os.environ['WANDB_DISABLE_CODE'] = 'false'
+    else:
+        os.environ['WANDB_DISABLE_CODE'] = 'true'
+
+    # Add the wandb group to work_dir to prevent conflicts if running multiple repetitions of the same configuration
+    model_type = get_model_type(model_cfg)
+    group_notes = model_type + '_pretrain15' + "_dropout" + str(model_cfg['dropout']) + '_tempkernel' + str(model_cfg['temporal_kernel_size']) + "_batch" + str(batch_size)
+    wandb_local_id = wandb.util.generate_id()
+    wandb_group = wandb_local_id + "_" + outcome_label + "_" + group_notes
     work_dir = os.path.join(work_dir, wandb_group)
 
-    # prepare data loaders
+    # Format data loaders
     if isinstance(dataset_cfg, dict):
         dataset_cfg = [dataset_cfg]
 
     # Check if we should use gait features
     if 'use_gait_feats' in dataset_cfg[1]['data_source']:
         model_cfg['use_gait_features'] = dataset_cfg[1]['data_source']['use_gait_feats']
-        # input(model_cfg['use_gait_features'])
 
 
-    wandb_local_id = wandb.util.generate_id()
-
-    # Correctly set the full data path depending on if launched from local or cluster env
-    if launch_from_local:
-        work_dir = os.path.join(local_data_base, work_dir)
-        wandb_log_local_group = os.path.join(local_output_wandb, wandb_local_id)
-
-        model_zoo_root = local_model_zoo_base
-        dataloader_temp = local_dataloader_temp
-
-        for i in range(len(dataset_cfg)):
-            dataset_cfg[i]['data_source']['data_dir'] = os.path.join(local_data_base, dataset_cfg[i]['data_source']['data_dir'])
-    else: # launching from the cluster
-        global fast_dev
-        fast_dev = False
-        model_zoo_root = cluster_model_zoo_base
-        dataloader_temp = cluster_dataloader_temp
-
-        for i in range(len(dataset_cfg)):
-            dataset_cfg[i]['data_source']['data_dir'] = os.path.join(cluster_data_base, dataset_cfg[i]['data_source']['data_dir'])
-
-        wandb_log_local_group = os.path.join(cluster_output_wandb, wandb_local_id)
-        work_dir = os.path.join(cluster_workdir_base, work_dir)
-
-    simple_work_dir = work_dir
-    os.makedirs(simple_work_dir)
-
-    print(simple_work_dir)
-    print(wandb_log_local_group)
+    # Set the paths for input and output
+    work_dir = os.path.join(resource_root, work_dir)
+    wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
+    model_zoo_root = os.path.join(resource_root, 'model_zoo')
+    dataloader_temp = os.path.join(resource_root, 'dataloaders')
+    local_data_base = os.path.join(resource_root, 'data')
+    for i in range(len(dataset_cfg)):
+        dataset_cfg[i]['data_source']['data_dir'] = os.path.join(local_data_base, dataset_cfg[i]['data_source']['data_dir'])
 
 
+    os.makedirs(work_dir)
     os.environ["WANDB_RUN_GROUP"] = wandb_group
+
+    # Load data from provided dataloaders
 
     # All data dir (use this for finetuning with the flip loss)
     data_dir_all_data = dataset_cfg[0]['data_source']['data_dir']
@@ -264,7 +235,7 @@ def eval(
             print('optimizer_cfg_stage_1 ', optimizer_cfg_stage_1)
 
             work_dir_amb = work_dir + "/" + str(test_id)
-            simple_work_dir_amb = simple_work_dir + "/" + str(test_id)
+            simple_work_dir_amb = work_dir + "/" + str(test_id)
 
             things_to_log = {'num_ts_predicting': model_cfg['num_ts_predicting'], 'es_start_up_1': es_start_up_1, 'es_patience_1': es_patience_1, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': num_reps, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_1, 'optimizer_cfg': optimizer_cfg_stage_1, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
 
@@ -813,8 +784,7 @@ def finetune_model(
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor, optimizer, work_dir, log_level, num_class=num_class, \
                     things_to_log=things_to_log, early_stopping=early_stopping, force_run_all_epochs=force_run_all_epochs, \
-                    es_patience=es_patience, es_start_up=es_start_up, freeze_encoder=freeze_encoder, finetuning=True,\
-                    log_conf_mat=log_conf_mat)
+                    es_patience=es_patience, es_start_up=es_start_up, freeze_encoder=freeze_encoder, finetuning=True)
     runner.register_training_hooks(**training_hooks_local)
 
     # run
@@ -962,7 +932,7 @@ def pretrain_model(
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor_position_pretraining, optimizer, work_dir, log_level, \
                     things_to_log=things_to_log, early_stopping=early_stopping, force_run_all_epochs=force_run_all_epochs, \
-                    es_patience=es_patience, es_start_up=es_start_up, visualize_preds=visualize_preds, log_conf_mat=log_conf_mat)
+                    es_patience=es_patience, es_start_up=es_start_up, visualize_preds=visualize_preds)
     runner.register_training_hooks(**training_hooks_local)
 
     # run

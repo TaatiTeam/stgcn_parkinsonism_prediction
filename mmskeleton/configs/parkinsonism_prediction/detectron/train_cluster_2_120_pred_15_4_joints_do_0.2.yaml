@@ -15,7 +15,6 @@ argparse_cfg:
 processor_cfg:
   type: 'processor.parkinsonism_prediction.eval'
   workers: 1
-  test_ids: [48, 47, 34, 37, 27, 39, 46, 50, 52, 55, 57, 59, 66, 33]
   cv: 10
   exclude_cv: False
   notes: "two_part_loss"
@@ -35,6 +34,7 @@ processor_cfg:
   train_extrema_for_epochs: 25
   do_position_pretrain: True
   model_save_root: "objective_2_detectron_apr9"  # This is where we look for and save pretrained models
+  resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"
 
   # model setting
   model_cfg:
@@ -114,14 +114,14 @@ processor_cfg:
     lr: 0.0001,
     momentum: 0.9,
     nesterov: true,
-    weight_decay: 0.000001}
+    weight_decay: 0.00000}
 
     # Fine tuning
     - {type: 'torch.optim.SGD',
     lr: 0.001,
     momentum: 0.9,
     nesterov: true,
-    weight_decay: 0.00001}
+    weight_decay: 0.0000}
 
   # runtime setting
   workflow: [['train', 1], ['val', 1], ['test', 1]]

@@ -119,23 +119,15 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     data_all = data.cuda()
     gait_features_all = gait_features.cuda()
     label = label.cuda()
-    # print('label', label.shape)
+
     # Remove the -1 labels
     y_true_all = label.data.reshape(-1, 1).float()
     non_pseudo_label = non_pseudo_label.data.reshape(-1, 1)
-    # print("true labels: ", y_true)
     condition = y_true_all >= 0.
-    # print(len(y_true_all))
-    
+
     row_cond = condition.all(1)
     y_true = y_true_all[row_cond, :]
-    # input(len(y_true))
 
-    # print("non_pseudo_label", non_pseudo_label.shape)
-    # print("row_cond", row_cond.shape)
-    # print("y_true", y_true.shape)
-    # print(model.module.use_gait_features, model.module.gait_feat_num)
-    # # input('here')
     non_pseudo_label = non_pseudo_label[row_cond, :]
     data = data_all.data[row_cond, :]
     gait_features = gait_features_all.data[row_cond, :]
@@ -150,8 +142,6 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         output_all_flipped = model_2(data_all_flipped, gait_features_all)
         torch.clamp(output_all_flipped, min=-1, max=num_class+1)
 
-    # print("in batch processorv2"*10)
-
     # Get predictions from the model
     output_all = model(data_all, gait_features_all)
 
@@ -159,10 +149,6 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         raise ValueError("=============================== got all zero output...")
     output = output_all[row_cond]
     loss_flip_tensor = torch.tensor([0.], dtype=torch.float, requires_grad=True) 
-
-    # Clip the predictions to avoid large loss that would otherwise be dealt with using the raw predictions
-    # torch.clamp(output_all, min=-1, max=num_class + 1)
-    # print("num_class", num_class)
 
     if have_flips:
         loss_flip_tensor = mse_loss(output_all_flipped, output_all)
@@ -175,28 +161,6 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     else:
         loss_flip_tensor = loss_flip_tensor * flip_loss_mult
 
-    # if we don't have any valid labels for this batch...
-    # print("num_valid samples is: ", num_valid_samples)
-
-    # if num_valid_samples < 1:
-    #     labels = []
-    #     preds = []
-    #     raw_preds = []
-    #     # loss_tensor = torch.tensor([0.], dtype=torch.float, requires_grad=True) 
-    #     # loss_tensor = loss_tensor.cuda()
-
-    #     if type(num_ts) is not list:
-    #         num_ts = [num_ts]
-
-    #     log_vars = dict(loss_label=0, loss_flip = loss_flip_tensor.item(), loss_all=loss_flip_tensor.item())
-    #     log_vars['mae_raw'] = 0
-    #     log_vars['mae_rounded'] = 0
-    #     output_labels = dict(true=labels, pred=preds, raw_preds=raw_preds, name=name, num_ts=num_ts)
-    #     outputs = dict(loss=loss_flip_tensor, log_vars=log_vars, num_samples=0)
-    #     print(num_valid_samples)
-    #     print(output_labels)
-    #     input("num_valid_samples")
-    #     return outputs, output_labels, loss_flip_tensor.item()
     
     # Calculate the label loss
     non_pseudo_label = non_pseudo_label.reshape(1,-1).squeeze()
@@ -231,7 +195,7 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     non_pseudo_label  = non_pseudo_label.data.tolist()
     labels = y_true_orig_shape.data.tolist()
     y_true_all = y_true_all.data.squeeze().tolist()
-    # print(labels)
+
     num_ts = num_ts.data.tolist()
     # Case when we have a single output
     if type(labels) is not list:
@@ -268,7 +232,6 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
 
     overall_loss = losses + loss_flip_tensor
     log_vars = dict(loss_label=losses.item(), loss_flip = loss_flip_tensor.item(), loss_all=overall_loss.item())
-    # print('l1', losses, 'l2', loss_flip_tensor)
 
     try:
         log_vars['mae_raw'] = mean_absolute_error(labels, output)
@@ -277,17 +240,11 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     except:
         log_vars['mae_raw'] = math.nan
         log_vars['mae_rounded'] = math.nan
-        # print("labels: ", labels, "output", output)
-        # print('input', torch.sum(torch.isnan(data_all)))
-        # print('output_all', output_all, 'output_all_flipped', output_all_flipped)
-        # raise ValueError('stop')
+
 
     output_labels = dict(true=labels, raw_labels=y_true_all, non_pseudo_label=non_pseudo_label,\
          pred=preds, raw_preds=output_list, raw_preds_all=output_list_all, round_preds_all=output_list_all_rounded, name=name, num_ts=num_ts)
     outputs = dict(loss=overall_loss, log_vars=log_vars, num_samples=len(labels), demo_data=demo_data)
-    # print(type(labels), type(preds))
-    # print('this is what we return: ', output_labels)
-    # print("returning true: ", output_labels['true'])
     return outputs, output_labels, overall_loss
 
 
@@ -623,9 +580,6 @@ def weights_init_cnn(m):
         if m.bias is not None:
             m.bias.data.fill_(0.1)
 
-def my_loss(output, target):
-    loss = torch.mean((output - target)**2)
-    return loss
 
 #https://discuss.pytorch.org/t/how-to-implement-weighted-mean-square-error/2547
 def weighted_mse_loss(input, target, weights):
@@ -708,8 +662,6 @@ def plot_confusion_matrix( y_true, y_pred, classes, max_label, normalize=False,t
             title = 'Confusion matrix, without normalization'
 
 
-    # How many classes are there? Go from 0 -> max in preds or labels
-    # max_label = max(max(y_true), max(y_pred))
     class_names_int = [int(i) for i in range(max_label)]
     classes = [str(i) for i in range(max_label)]
     cm = confusion_matrix(y_true, y_pred, labels=class_names_int)
@@ -722,6 +674,7 @@ def plot_confusion_matrix( y_true, y_pred, classes, max_label, normalize=False,t
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
     ax.figure.colorbar(im, ax=ax)
+
     # We want to show all ticks...
     ax.set(xticks=np.arange( cm.shape[1]),
         yticks=np.arange( cm.shape[0]),
@@ -735,7 +688,6 @@ def plot_confusion_matrix( y_true, y_pred, classes, max_label, normalize=False,t
     ax.set_ylim(cm.shape[0]-0.5, -0.5)
 
     # Rotate the tick labels and set their alignment.
-    # print(ax.get_xticklabels())
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
             rotation_mode="anchor")
 
@@ -749,113 +701,6 @@ def plot_confusion_matrix( y_true, y_pred, classes, max_label, normalize=False,t
                     color="white" if cm[i, j] > thresh else "black")
     fig.tight_layout()
     return fig
-
-
-
-# def plot_confusion_matrix( y_true, y_pred, classes,normalize=False,title=None,cmap=plt.cm.Blues):
-
-#     if not title:
-#         if normalize:
-#             title = 'Normalized confusion matrix'
-#         else:
-#             title = 'Confusion matrix, without normalization'
-
-
-
-#     cm = confusion_matrix(y_true, y_pred)
-#     if cm.shape[1] is not len(classes):
-#         # print("our CM is not the right size!!")
-
-#         all_labels = y_true + y_pred
-#         y_all_unique = list(set(all_labels))
-#         y_all_unique.sort()
-
-
-#         try:
-#             max_cm_size = len(classes)
-#             print('max_cm_size: ', max_cm_size)
-#             cm_new = np.zeros((max_cm_size, max_cm_size), dtype=np.int64)
-#             for i in range(len(y_all_unique)):
-#                 for j in range(len(y_all_unique)):
-#                     i_global = y_all_unique[i]
-#                     j_global = y_all_unique[j]
-                    
-#                     cm_new[i_global, j_global] = cm[i,j]
-#         except:
-#             print('CM failed++++++++++++++++++++++++++++++++++++++')
-#             print('cm_new', cm_new)
-#             print('cm', cm)
-#             print('classes', classes)
-#             print('y_all_unique', y_all_unique)
-#             print('y_true', list(set(y_true)))
-#             print('y_pred', list(set(y_pred)))
-#             print('max_cm_size: ', max_cm_size)
-#             max_cm_size = max([len(classes), y_all_unique[-1]])
-
-#             cm_new = np.zeros((max_cm_size, max_cm_size), dtype=np.int64)
-#             for i in range(len(y_all_unique)):
-#                 for j in range(len(y_all_unique)):
-#                     i_global = y_all_unique[i]
-#                     j_global = y_all_unique[j]
-#                     try:
-#                         cm_new[i_global, j_global] = cm[i,j]
-#                     except:
-#                         print('CM failed second time++++++++++++++++++++++++++++++++++++++')
-#                         print('cm_new', cm_new)
-#                         print('cm', cm)
-#                         print('classes', classes)
-#                         print('y_all_unique', y_all_unique)
-#                         print('y_true', list(set(y_true)))
-#                         print('y_pred', list(set(y_pred)))
-#                         print('max_cm_size: ', max_cm_size)
-
-
-
-#         cm = cm_new
-
-#         classes = [i for i in range(max_cm_size)]
-
-#     # print(cm)
-#     # classes = classes[unique_labels(y_true, y_pred).astype(int)]
-#     if normalize:
-#         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-
-#         # print("Normalized confusion matrix")
-#     # else:
-#         # print('Confusion matrix, without normalization')
-# # 
-#     #print(cm)
-
-#     fig, ax = plt.subplots(figsize=(8, 6))
-#     im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
-#     ax.figure.colorbar(im, ax=ax)
-#     # We want to show all ticks...
-#     ax.set(xticks=np.arange( cm.shape[1]),
-#         yticks=np.arange( cm.shape[0]),
-#         # ... and label them with the respective list entries
-#         xticklabels=classes, yticklabels=classes,
-#         title=title,
-#         ylabel='True label',
-#         xlabel='Predicted label')
-    
-#     ax.set_xlim(-0.5, cm.shape[1]-0.5)
-#     ax.set_ylim(cm.shape[0]-0.5, -0.5)
-
-#     # Rotate the tick labels and set their alignment.
-#     # print(ax.get_xticklabels())
-#     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-#             rotation_mode="anchor")
-
-#     # Loop over data dimensions and create text annotations.
-#     fmt = '.3f' if normalize else 'd'
-#     thresh = cm.max() / 2.
-#     for i in range(cm.shape[0]):
-#         for j in range(cm.shape[1]):
-#             ax.text(j, i, format(cm[i, j], fmt),
-#                     ha="center", va="center",
-#                     color="white" if cm[i, j] > thresh else "black")
-#     fig.tight_layout()
-#     return fig
 
 def regressionPlotByGroup(labels, raw_preds, classes, fig_title, non_pseudo_label=None):
     labels = np.asarray(labels)
@@ -908,20 +753,6 @@ def regressionPlot(labels, raw_preds, classes, fig_title):
 
 
 def rmdir(directory):
-    # directory = Path(directory)
-    # for item in directory.iterdir():
-    #     if item.is_dir():
-    #         rmdir(item)
-    #     else:
-    #         item.unlink()
-    # print("deleting: ", directory)
-    # print("with: ", os.listdir(directory))
-    # for f in os.listdir(directory):
-    #     to_rm = os.path.join(directory,f)
-    #     print("removing this: ", to_rm)
-    #     os.remove(to_rm)
-    # print("with2: ", os.listdir(directory))
-
     try:
         directory.rmdir()
     except:
@@ -943,10 +774,6 @@ def robust_rmtree(path, logger=None, max_retries=3):
             shutil.rmtree(path)
             return
         except Exception as e:
-            # print(e)
-            # print('Unable to remove path: %s' % path)
-            # print('Retrying after %d seconds' % dt)
-            # print('files it has: ', os.listdir(path))
             rmdir(path)
             time.sleep(dt)
             dt *= 1.5
@@ -959,7 +786,6 @@ def sync_wandb(wandb_local_id):
     # Sync everything to wandb at the end
     try:
         os.system('wandb sync ' + wandb_local_id)
-
 
         # Delete the work_dir if successful sync
         try:
