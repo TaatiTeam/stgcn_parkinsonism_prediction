@@ -790,7 +790,6 @@ def sync_wandb(wandb_local_id):
         # Delete the work_dir if successful sync
         try:
             robust_rmtree(wandb_local_id)
-            # shutil.rmtree(work_dir)
         except:
             logging.exception('This: ')
             print('failed to delete the wandb_log_local_group folder: ', wandb_local_id)
@@ -799,3 +798,33 @@ def sync_wandb(wandb_local_id):
         print('failed to sync wandb')
 
 
+def getAllInputFiles(dataset_cfg):
+    # If we only have one dataset, use this to create the train/val or test sets (depending on calling function), otherwise,
+    # if two datasets are provided, assume the second one is the independent test set (so one will not
+    # be split off and created from the first dataset_cfg)
+
+    data_dir_all_data = dataset_cfg[0]['data_source']['data_dir']
+    first_dataset = [os.path.join(data_dir_all_data, f) for f in os.listdir(data_dir_all_data) if os.path.isfile(os.path.join(data_dir_all_data, f))] 
+    have_second_dataset = False
+    second_dataset = []
+
+    if len(dataset_cfg) == 2:
+        have_second_dataset = True
+        data_dir_second = dataset_cfg[1]['data_source']['data_dir']
+        second_dataset = [os.path.join(data_dir_second, f) for f in os.listdir(data_dir_second) if os.path.isfile(os.path.join(data_dir_second, f))] 
+
+    first_dataset.sort()
+    second_dataset.sort()
+
+    return first_dataset, second_dataset, have_second_dataset
+
+
+def initModel(model_cfg_local):
+    if isinstance(model_cfg_local, list):
+        model = [call_obj(**c) for c in model_cfg_local]
+        model = torch.nn.Sequential(*model)
+
+    else:
+        model = call_obj(**model_cfg_local)
+
+    return model
