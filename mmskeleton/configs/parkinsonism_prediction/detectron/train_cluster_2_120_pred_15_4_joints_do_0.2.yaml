@@ -50,7 +50,6 @@ processor_cfg:
       layout: 'coco_simplified_head'
       strategy: 'spatial'
   loss_cfg:
-    - {type: 'mmskeleton.processor.utils_recognition.WingLoss'} # This is for pretraining
     - {type: 'torch.nn.MSELoss'} # This is for finetuning
     
 

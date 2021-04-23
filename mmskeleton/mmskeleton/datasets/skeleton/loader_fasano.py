@@ -29,7 +29,6 @@ class SkeletonLoaderFasano(torch.utils.data.Dataset):
         
         # Look for belmont data and repeat it if necessary
         self.belmont_data = []
-
         self.files.extend(self.belmont_data  * (belmont_data_mult-1))
 
         # print("belmont_data", self.belmont_data)

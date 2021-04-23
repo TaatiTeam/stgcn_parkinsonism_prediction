@@ -24,7 +24,6 @@ import numpy as np
 from .pytorchtools import EarlyStopping
 import os
 import wandb
-# from ...early_stopping_pytorch/pytorchtools import EarlyStopping
 
 def weight_reset(m):
     if isinstance(m, torch.nn.Conv1d) or isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Conv3d) or isinstance(m, torch.nn.Linear):
@@ -32,14 +31,12 @@ def weight_reset(m):
 
 
 class TooManyRetriesException(Exception):
-    """Exception raised for errors in the input salary.
+    """Exception raised for errors in the input.
 
     """
-
     def __init__(self, message="Too many retries"):
         self.message = message
         super().__init__(self.message)
-
 
 
 
@@ -107,6 +104,7 @@ class Runner(object):
             self.work_dir = osp.abspath(work_dir)
             print("workdir in mmcv runner is: ", self.work_dir)
             mmcv.mkdir_or_exist(self.work_dir)
+
         elif work_dir is None:
             self.work_dir = None
         else:
@@ -124,7 +122,6 @@ class Runner(object):
 
 
         if logger is None:
-            print('Andrea - making new logger')
             self.logger = self.init_logger(work_dir, log_level)
         else:
             self.logger = logger
@@ -452,7 +449,6 @@ class Runner(object):
                     _, name_clean = os.path.split(fig_name)
                     fig_save = os.path.join(output_folder, name_clean + '_epoch' + str(self.epoch) + '_.png')
                     # fig.savefig(fig_save)
-
 
             else: 
                 return
@@ -898,113 +894,6 @@ class Runner(object):
         self.early_stopping_epoch = 0
         return predicted_joint_positions, last_joint_position, true_future_joint_positions, predicted_joint_positions_ref, last_joint_position_ref, true_future_joint_positions_ref, names
 
-        # while not_done:
-        #     print('===================evaluating pretraining...=========================')
-
-
-
-
-        #     try: 
-        #         print("Starting training for ", self.work_dir)
-        #         assert isinstance(data_loaders, list)
-        #         assert mmcv.is_list_of(workflow, tuple)
-        #         assert len(data_loaders) == len(workflow)
-
-        #         # if self.pretrain_mode:
-        #         #     es_checkpoint = self.work_dir + '/pretrain_checkpoint.pt'
-        #         # else:
-        #         #     es_checkpoint = self.work_dir + '/checkpoint.pt'
-
-        #         es_checkpoint = self.work_dir + '/checkpoint.pt'
-        #         self.es_checkpoint = es_checkpoint
-        #         if self.early_stopping:
-        #             self.early_stopping_obj = EarlyStopping(patience=self.es_patience, verbose=True, path=es_checkpoint)
-
-        #         self._max_epochs = max_epochs
-        #         for i, flow in enumerate(workflow):
-        #             mode, epochs = flow
-
-        #             if mode == 'train':
-        #                 self._max_iters = self._max_epochs * len(data_loaders[i])
-        #                 break
-
-        #         work_dir = self.work_dir if self.work_dir is not None else 'NONE'
-        #         self.logger.info('Start running, host: %s, work_dir: %s',
-        #                         get_host_info(), work_dir)
-        #         self.logger.info('workflow: %s, max: %d epochs', workflow, max_epochs)
-        #         self.call_hook('before_run')
-        #         print("work dir: ", self.work_dir)
-        #         train_accs = np.zeros((1, max_epochs)) * np.nan
-        #         val_accs = np.zeros((1, max_epochs)) * np.nan
-                
-        #         columns = ['epoch', 'train_acc', 'val_acc']
-        #         df_all = pd.DataFrame(columns=columns)
-        #         print('mmcv - runner.run(), max_epochs')
-        #         input(max_epochs)
-        #         while self.epoch < max_epochs:
-        #             for i, flow in enumerate(workflow):
-        #                 mode, epochs = flow
-        #                 kwargs['workflow_stage'] = mode
-        #                 kwargs['cur_epoch'] = self.epoch
-
-        #                 if isinstance(mode, str):  # self.train()
-        #                     print('mmcv: 846', mode)
-        #                     if not hasattr(self, mode):
-        #                         raise ValueError(
-        #                             f'runner has no method named "{mode}" to run an '
-        #                             'epoch')
-        #                     epoch_runner = getattr(self, mode)
-        #                 elif callable(mode):  # custom train()
-        #                     epoch_runner = mode
-        #                 else:
-        #                     raise TypeError('mode in workflow must be a str or '
-        #                                     f'callable function, not {type(mode)}')
-        #                 for _ in range(epochs):
-        #                     if mode == 'train' and self.epoch >= max_epochs:
-        #                         return
-        #                     true_labels, predicted_labels = epoch_runner(data_loaders[i], **kwargs)
-
-        #                     if not self.pretrain_mode:
-        #                         acc = accuracy_score(true_labels, predicted_labels)
-
-        #                         if mode == 'train':
-        #                             df_all.loc[len(df_all)] = [self.epoch-1, acc, val_accs[0, self.epoch - 1]]
-
-        #                         elif mode == 'val':
-        #                             val_accs[0, self.epoch-1] = acc
-        #                             df_all.loc[df_all['epoch'] == self.epoch-1,'val_acc'] = acc
-        #                     else: 
-        #                         # What to do after epoch if we're in pretrain mode
-        #                         print('curr_epoch', self.epoch)
-        #                         input("unhandled else,  - pretrain_eval: 874")
-        #                         break
-        #                         pass
-
-        #             if self.early_stopping:
-        #                 print('checking early stopping:', self.early_stopping_obj.early_stop, self.force_run_all_epochs)
-        #                 if not self.force_run_all_epochs and self.early_stopping_obj.early_stop:
-        #                     print('should STOP now')
-        #                     break
-
-        #             # We have successfully finished this participant
-        #             not_done = False
-        #             input('done for this participant')
-        #             break
-
-        #     except Exception as e: 
-        #         max_retry_counter += 1
-        #         print("exception: ", e)
-
-        #         if max_retry_counter >= max_retry:
-        #             not_done = False
-        #             raise TooManyRetriesException
-
-        #     if not self.pretrain_mode:
-        #         self.early_stop_eval(es_checkpoint, workflow, data_loaders, **kwargs)
-        #     else:
-        #         input("900")
-        #         self.early_stop_eval_pretrain(es_checkpoint, workflow, data_loaders, **kwargs)
-
 
 
     def run(self, data_loaders, workflow, max_epochs, **kwargs):
@@ -1172,7 +1061,9 @@ class Runner(object):
             print("data_loaders", data_loaders)
 
             if not self.pretrain_mode:
-                self.early_stop_eval(es_checkpoint, workflow, data_loaders, **kwargs)
+                self.model.load_state_dict(torch.load(es_checkpoint))
+                self.model.eval()
+                self.early_stop_eval(workflow, data_loaders, **kwargs)
             else:
                 pass
 
@@ -1184,9 +1075,7 @@ class Runner(object):
         return self.model, self.early_stopping_epoch
 
 
-
-    def early_stop_eval(self, es_checkpoint, workflow, data_loaders, **kwargs):
-        self.model.load_state_dict(torch.load(es_checkpoint))
+    def early_stop_eval(self, workflow, data_loaders, **kwargs):
         self.model.eval()
         print("doing final eval:")
         for i, flow in enumerate(workflow):
@@ -1198,7 +1087,6 @@ class Runner(object):
             true_labels, predicted_labels, raw_preds, names, num_ts, demo_data, all_data  = self.basic_no_log_eval(data_loaders[i], **kwargs)
             acc = accuracy_score(true_labels, predicted_labels)
             # print(demo_data)
-            # input('early_stop_eval')
             final_results_base, amb = os.path.split(self.work_dir)
             try:
                 print(self.things_to_log)
