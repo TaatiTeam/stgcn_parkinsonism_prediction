@@ -20,7 +20,8 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
     def __init__(self, data_dir, num_track=1, repeat=1, num_keypoints=-1, 
                 outcome_label='UPDRS_gait', missing_joint_val=0, csv_loader=False, 
                 cache=False, layout='kinect_coco_simplified_head', flip_skels=False, 
-                belmont_data_mult = 0, use_gait_feats=False, scaler=None, export_2d=False):
+                belmont_data_mult = 0, use_gait_feats=False, scaler=None, export_2d=False,
+                extrema_range=None):
         self.data_dir = data_dir
         self.num_track = num_track
         self.num_keypoints = num_keypoints
@@ -29,10 +30,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         
         # Look for belmont data and repeat it if necessary
         self.belmont_data = None
-
-        # self.files.extend(self.belmont_data  * (belmont_data_mult-1))
-
-        # print("belmont_data", self.belmont_data)
 
         self.outcome_label = outcome_label
         self.missing_joint_val = missing_joint_val
@@ -46,17 +43,21 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             self.interpolate_with_mean = True
             self.missing_joint_val = 0
 
+        self.extrema_range = extrema_range
+        if not self.extrema_range:
+            if self.outcome_label == "SAS_gait":
+                self.extrema_range = 3
+            else:
+                self.extrema_range = 2
+
         self.class_dist = {}
-        for i in range(3):
+        for i in range(self.extrema_range + 1):
             self.class_dist[i] = 0 
-
-        if self.outcome_label == "SAS_gait":
-            self.class_dist[3] = 0
-
 
         self.cache = cache
         self.cached_data = {}
 
+     
         self.sample_extremes = False
         self.cached_extreme_inds = []
 
@@ -91,33 +92,22 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
 
                 # For kinect also need to clean up the filenames
                 def cleanup_names(name):
-                    # input(name)
                     # max length is 42
                     temp_name = name[6:42]
                     # Now split this and remove trailing Skel
                     parts = temp_name.split("_")
-                    # input(name)
                     if (parts[-1]).isalpha():
                         parts = parts[0:-1]
-                        # print(parts)
                     elif ((parts[-1]).isnumeric() and (parts[-2]).isnumeric()):
                         parts.insert(-1, '')
-                        # print("_".join(parts))
-
-                    
 
                     return "_".join(parts)
 
                 df['walk_name'] = df['walk_name_full'].apply(cleanup_names)
     
-                # input(df)
-
-
 
                 self.gait_feats = df
                 self.num_gait_feats = len(self.gait_feats_names)
-
-
 
 
             except:
@@ -127,15 +117,12 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             print("loading data to cache...")
             for index in range(self.__len__()):
                 self.get_item_loc(index)
-            # print(self.cached_extreme_inds)
 
     def get_class_dist(self):
         if self.sample_extremes:
             extrema_dist = copy.deepcopy(self.class_dist)
-            extrema_dist[1] = 0
-
-            if self.outcome_label == "SAS_gait":
-                extrema_dist[2] = 0
+            for i in range(1, self.extrema_range):
+                extrema_dist[i] = 0
 
             return extrema_dist
             
@@ -170,7 +157,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         elif newLabel > 2 and self.outcome_label == "UPDRS_gait":
             newLabel = 2
 
-        # print("assigning to index: ", index, " old label: ",  self.cached_data[index]['category_id'], " new label: ", newLabel, "rounded old_label:", int(round(self.cached_data[index]['category_id'])), " data length: ", self.class_dist)
         
         # Update the class distributions
         old_label = int(round(self.cached_data[index]['category_id']))
@@ -202,12 +188,10 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             self.cached_extreme_inds.append(index)
 
     def isExtrema(self, label):
-        # label = self.cached_data[index]['category_id'] 
-        if label == 0 or \
-                    (self.outcome_label == "UPDRS_gait" and label == 2) or \
-                    (self.outcome_label == "SAS_gait" and label == 3):
+        if (label == 0 or label == self.extrema_range):
             return True
         return False
+
 
 
     def get_item_loc(self, index):
@@ -284,19 +268,13 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             if self.use_gait_feats:
                 # How we clean the walk name depends if we have 2D or 3D data
                 # For 3D data we need to keep the state
-
                 clean_walk_name = data_struct['walk_name'][0][0:-8]
-                # print(clean_walk_name)
-                # input("inkinectlaoder")
 
                 # Use the gait features if requested and available
                 if self.gait_feats is not None:
                     row = self.gait_feats.loc[self.gait_feats['walk_name'] == clean_walk_name, self.gait_feats_names]
                     if not row.empty:
-                        # row = row / 100
-                        # input('found ' + clean_walk_name)
                         gait_feature_vec = row.values.tolist()[0]
-
 
 
             if self.layout == 'kinect_coco_simplified_head':
@@ -324,25 +302,16 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                         "version": "1.0"
                 }
 
-                # if self.export_2d:
-                #     info_struct["keypoint_channels"] =  ["x", "y"]
-                # else:
-                #     info_struct["keypoint_channels"] =  ["x", "y", "z"]
+                if self.export_2d:
+                    info_struct["keypoint_channels"] =  ["x", "y", "z_invalid"]
 
             except:
                 print('data_struct', data_struct)            
                 raise ValueError("something is wrong with the data struct", self.files[file_index])
-            # order_of_keypoints = {'Nose', 
-            #     'RShoulder', 'RElbow', 'RWrist', 
-            #     'LShoulder', 'LElbow', 'LWrist', 
-            #     'RHip', 'RKnee', 'RAnkle', 
-            #     'LHip', 'LKnee', 'LAnkle', 
-            #     'REye', 'LEye', 'REar', 'LEar'}
 
             # If we have belmont data, reverse the order of the resolution parameter since the video is in portrait mode
             first_char = data_struct['walk_name'][0][0]
             if first_char.upper() == "B":
-                # print(data_struct['walk_name'][0], len(data_struct['time']))
                 info_struct['resolution'] = [1080, 1920]
 
             annotations = []
@@ -358,7 +327,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                         z = self.missing_joint_val
                     else:
                         z = data_struct[kp + '_z'][ts]      
-                
 
                     # check if we are missing actual joint coordinates
                     try:
@@ -415,14 +383,9 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                             else:           
                                 x_flipped = self.missing_joint_val
 
-
-
-
                         if math.isnan(x_flipped):
                             x_flipped = self.missing_joint_val
 
-
- 
                     ts_keypoints.append([x, y, z])
                     ts_keypoints_flipped.append([x_flipped, y, z])
 
@@ -459,15 +422,12 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                 data = json.load()
 
         info = data['info']
-
-
         num_frame = info['num_frame']
         num_keypoints = info[
             'num_keypoints'] if self.num_keypoints <= 0 else self.num_keypoints
         channel = info['keypoint_channels']
         num_channel = len(channel)
 
-        # # get data
         data['data'] = np.zeros(
             (num_channel, num_keypoints, num_frame, self.num_track),
             dtype=np.float32)
@@ -507,20 +467,12 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         flipped_data['name'] = self.files[file_index] + "_flipped"
 
         data['name'] = self.files[file_index]
-        
         data['index'] = index
         flipped_data['index'] = flip_index
 
-
         # Add to extrema list if this score is on the extremes
-        if data['category_id'] == 0 or \
-            (self.outcome_label == "UPDRS_gait" and data['category_id'] == 2) or \
-            (self.outcome_label == "SAS_gait" and data['category_id'] == 3):
-
+        if isExtrema(self, data['category_id']):
             self.cached_extreme_inds.append(index)
-            # if self.flip_skels:
-            #     self.cached_extreme_inds.append(flip_index)
-
 
         if self.cache:
             self.cached_data[index] = data
@@ -528,7 +480,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             if self.flip_skels:    
                 self.cached_data[flip_index] = flipped_data
                 
-
 
         if self.flip_skels and return_flip:
             return flipped_data
@@ -540,9 +491,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         if index in self.cached_data:
             if self.sample_extremes:
                 extremaInd = index % self.extremaLength()
-                # print(self.extremaLength(), self.__len__(), "want index: ", extremaInd)
-                
-                # return self.get_item_loc(self.cached_extreme_inds[extremaInd])
                 return copy.deepcopy(self.cached_data[self.cached_extreme_inds[extremaInd]])
             else:
                 return self.cached_data[index]

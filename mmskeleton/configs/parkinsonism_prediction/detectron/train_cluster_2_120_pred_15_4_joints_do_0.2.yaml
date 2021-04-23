@@ -70,6 +70,7 @@ processor_cfg:
         missing_joint_val: mean
         cache: True
         flip_skels: True
+        extrema_range: 2        # What is the highest score in this dataset
 
       pipeline:
         - {type: "datasets.skeleton.normalize_by_resolution"}

@@ -17,8 +17,6 @@ import numpy as np
 
 
 def computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv):
-    work_dir = "/home/saboa/code/stgcn_parkinsonsim_prediction/sample_data/work_dir/parkinsonism_prediction/1nx954ej_UPDRS_gait_v2_pretrain15_dropout0.2_tempkernel13_batch100"
-
     raw_results_dict = {}
 
     log_name = "CV_ALL"

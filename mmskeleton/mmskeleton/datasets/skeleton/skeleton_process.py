@@ -4,23 +4,6 @@ from mmskeleton.deprecated.datasets.utils import skeleton as skeleton_aaai18
 import time
 
 
-# def stgcn_aaai18_dataprocess(data,
-#                              window_size,
-#                              random_choose=False,
-#                              random_move=False):
-#     data = normalize_by_resolution(data)
-#     data = mask_by_visibility(data)
-#     # processing
-#     if random_choose:
-#         data['data'] = skeleton_aaai18.random_choose(data['data'], window_size)
-#     elif window_size > 0:
-#         data['data'] = skeleton_aaai18.auto_pading(data['data'], window_size)
-#     if random_move:
-#         data['data'] = skeleton_aaai18.random_move(data['data'])
-#     data = transpose(data, order=[0, 2, 1, 3])
-#     data = to_tuple(data)
-#     return data
-
 data_fields = ['data', 'data_flipped']
 
 def normalize_by_resolution(data):
@@ -37,7 +20,6 @@ def normalize_by_resolution(data):
         for i, c in enumerate(channel):
             if c == 'x':
                 np_array[i] = np_array[i] / resolution[0] - 0.5
-                # print('normalizing by resolution')
             if c == 'y':
                 np_array[i] = np_array[i] / resolution[1] - 0.5
             if c == 'z':
@@ -116,7 +98,7 @@ def transpose(data, order, key=None):
 
 
 def to_tuple(data):
-    keys=['data', 'category_id', 'name', 'num_ts', 'index', 'have_true_label'] # category_id is the score label or the future joint positions we want to predict
+    keys=['data', 'category_id', 'name', 'num_ts', 'index', 'have_true_label'] # category_id is the score label or the future joint positions we want to predict those (stage 1)
     if 'data_flipped' in data.keys():
         keys=['data', 'data_flipped',  'category_id', 'name', 'num_ts', 'index', 'have_true_label']
 
@@ -126,24 +108,16 @@ def to_tuple(data):
 
 
 
-    # print("keys: ", keys)
     tupled_data_list = [data[k] for k in keys]
     data_dict = {}
     data_dict['data'] = data['data']
     
-    # print(tupled_data_list)
-    # time.sleep(10)
-    # tupled_data_list[0]['data'] = tupled_data_list[0]
-
-
     if 'gait_feats' in data.keys():
         data_dict['gait_feats'] = np.asarray(data['gait_feats'])
     
     if 'demo_data' in data.keys():
-        # demo_data = {}
         for k in data['demo_data'].keys():
             data_dict['demo_data_' + k] = np.asarray(data['demo_data'][k])
-        # data_dict['demo_data'] = data['demo_data']
     tupled_data_list[0] = data_dict
 
     return tuple(tupled_data_list)
@@ -182,6 +156,7 @@ def temporal_repeat(data, size, random_crop=False):
 
 
 def select_joints_for_label(data, joints):
+# Reference for joint order
 # from loader_tri.py
 # self.layout == 'coco_simplified_head':
 #             num_kp = 13
@@ -193,7 +168,6 @@ def select_joints_for_label(data, joints):
 #                 'LKnee', 'RKnee',
 #                 'LAnkle', 'RAnkle',
 #             ]
-
 
     np_array = data['category_id']
     test = np_array[:, joints, :]
@@ -240,9 +214,6 @@ def pad_mean(data, size):
             continue
 
         np_array = data[data_field]
-        # mean_val = np.mean(np_array)
-        # print("np array is: ", np_array)
-        # print("mean val is:", mean_val)
         T = np_array.shape[2]
         if T < size:
             pad_shape = list(np_array.shape)
@@ -281,6 +252,8 @@ def crop_middle(data, size):
     return data
 
 
+# Note, this was only developed and tested for 2D data
+# TODO: Extend to 3D if want to use 
 def scale_walk(data, scale_range=[0.9, 1.1]):
     for data_field in data_fields:
         if data_field not in data.keys():
@@ -289,20 +262,17 @@ def scale_walk(data, scale_range=[0.9, 1.1]):
         scale_factor_x = random.uniform(scale_range[0], scale_range[1])
         scale_factor_y = random.uniform(scale_range[0], scale_range[1])
 
-        # print(scale_factor_x, scale_factor_y)
         np_array = data[data_field]
+
         # Want to scale the x,y coordinates, but not the confidence scores
         np_array[0, :, :, :] = np_array[0, :, :, :] * scale_factor_x
         np_array[1, :, :, :] = np_array[1, :, :, :] * scale_factor_y
         data[data_field] = np_array
 
-        # T = np_array.shape[2]
-        # if T > size:
-        #     begin = random.randint(0, T - size)
-        #     data[data_field] = np_array[:, :, begin:begin + size, :]
     return data
 
-
+# Note, this was only developed and tested for 2D data
+# TODO: Extend to 3D if want to use 
 def shear_walk(data, shear_range=[-0.1, 0.1]):
     for data_field in data_fields:
         if data_field not in data.keys():
@@ -312,7 +282,6 @@ def shear_walk(data, shear_range=[-0.1, 0.1]):
         shear_factor_y = random.uniform(shear_range[0], shear_range[1])
 
         shear_mat = np.asarray([[1, shear_factor_x, 0],[shear_factor_y, 1, 0],[0, 0, 1]])
-        # print(scale_factor_x, scale_factor_y)
         np_array = data[data_field]
 
         size = np_array.shape
@@ -321,8 +290,6 @@ def shear_walk(data, shear_range=[-0.1, 0.1]):
 
             
         row_data = np_array[:, :, :, :].squeeze().transpose(2,0,1) # t*3x13
-        # print('row data', row_data.shape)
-        # print('shear_mat_rep', shear_mat_rep.shape)
         temp = np.matmul(shear_mat,row_data)
         temp = temp.transpose(1, 2, 0)
         temp = temp[:, :, :, np.newaxis]
@@ -381,10 +348,7 @@ def pad_zero_beginning_for_joint_prediction(data, size, pred_ts):
         np_array = all_data[:, :, :T, :]
         pad_shape = list(np_array.shape)
         pad_shape[2] = size
-        # print('all_data: ', all_data.shape)
-        # print('np_array: ', np_array.shape)
-        #print(pad_shape)
-        
+
         if T <= 1:
             np_array_paded = np.zeros(pad_shape, dtype=np_array.dtype)
             data[data_field] = np_array_paded
@@ -396,17 +360,11 @@ def pad_zero_beginning_for_joint_prediction(data, size, pred_ts):
 
 
         elif T <= size:
-
             np_array_paded = np.zeros(pad_shape, dtype=np_array.dtype)
-            # print('np_array_paded: ', np_array_paded.shape)
-            # print('T: ', T)
-            # print('max_future_ts: ', max_future_ts)
-
             np_array_paded[:, :, -T:, :] = np_array
             data[data_field] = np_array_paded
 
             # Add the future timesteps for prediction to the categrory_id
-            # print('data shape: ', np_array_paded.shape)
             output_target = np.zeros([pad_shape[0], pad_shape[1], len(pred_ts)], dtype=np_array.dtype)
 
             for i in range(len(pred_ts)):

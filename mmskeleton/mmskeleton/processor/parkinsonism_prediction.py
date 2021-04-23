@@ -182,7 +182,7 @@ def eval(
 
             model_cfg_local = copy.deepcopy(model_cfg)
             pretrained_model = initModel(model_cfg_local)
-            continue
+            
             # Evaluate the model on the finetuning task
             evaluate_model(work_dir_amb,
                         pretrained_model,
@@ -317,8 +317,6 @@ def evaluate_model(
     except:
         print('failed to delete the wandb folder')    
     
-
-
 
 
 def finetune_model(
