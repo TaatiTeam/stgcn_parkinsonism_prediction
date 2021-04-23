@@ -209,13 +209,11 @@ def eval(
                         path_to_saved_dataloaders, 
                         path_to_pretrained_model)
 
-            # input('pause')
     except Exception as e:
         logging.exception(e)
         print(e)
 
     # Calculate summary metrics
-    # final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
     computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
     
     # Delete the work_dir
@@ -224,107 +222,6 @@ def eval(
     except:
         logging.exception('This: ')
         print('failed to delete the work_dir folder: ', work_dir)
-
-
-def final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv):
-    # work_dir = "/home/saboa/data/OBJECTIVE_2_ML_DATA/data/./work_dir/recognition/tri_all/dataset_example/v2/UPDRS/120_v0_pred15_ankles_wrists_wing/1t4a3yqu_UPDRS_gait_v0_pretrain15_dropout0.0_tempkernel5_batch100"
-    # work_dir = "/home/saboa/data/OBJECTIVE_2_ML_DATA/data/work_dir/recognition/tri_all/dataset_example/v2/UPDRS/120_v0_pred15_ankles_wrists_wing_do_01/176rgyac_UPDRS_gait_v10_pretrain15_dropout0.5_tempkernel5_batch100"
-    print("work_dir", work_dir)
-    print("wandb_group", wandb_group)
-    print("wandb_project", wandb_project)
-    print("total_epochs", total_epochs)
-    print("num_class", num_class)
-    print("workflow", workflow)
-    print("cv", cv)
-
-    raw_results_dict = {}
-
-    log_name = "CV_ALL"
-    wandb.init(name=log_name, project=wandb_project, group=wandb_group, config = {'wandb_group':wandb_group}, tags=['summary'], reinit=True)
-    wandb.Table.MAX_ROWS =100000
-    results_table = set_up_results_table(workflow, num_class)
-
-    # Load in all the data from all folds
-    for i, flow in enumerate(workflow):
-        mode, _ = flow
-
-        root_result_path = os.path.join(work_dir, 'all_final_eval')
-        root_result_path_1 = os.path.join(root_result_path, '1', mode+'.csv')
-        df_all = pd.read_csv(root_result_path_1)
-
-        for i in range(2, cv + 1):
-            root_result_path_temp = os.path.join(root_result_path, str(i), mode+'.csv')
-            df_temp = pd.read_csv(root_result_path_temp)
-            df_all = df_all.append(df_temp)
-
-
-        df_all['demo_data_is_flipped'] = df_all.apply(label_flipped, axis=1)
-        raw_results_dict[mode] = copy.deepcopy(df_all)
-
-
-        wandb.log({mode+'_CSV': wandb.Table(dataframe=df_all)})
-        reg_fig_DBS, reg_fig_MEDS, con_mat_fig_normed, con_mat_fig = createSummaryPlots(df_all, num_class)
-
-        log_vars = computeSummaryStats(df_all, num_class, mode)
-        wandb.log(log_vars)
-
-        wandb.log({"confusion_matrix/" + mode + "_final_confusion_matrix.png": con_mat_fig})
-        wandb.log({"confusion_matrix/" + mode + "_final_confusion_matrix_normed.png": con_mat_fig_normed})
-        if mode == "test":
-            _, results_dict = compute_obj2_stats(df_all)
-            wandb.log(results_dict)
-
-            wandb.log({"regression_plot/"+ mode + "_final_regression_DBS.png": [wandb.Image(reg_fig_DBS)]})
-            wandb.log({"regression_plot/"+ mode + "_final_regression_MEDS.png": [wandb.Image(reg_fig_MEDS)]})
-
-
-    # Compute stats for each fold
-    for i in range(cv):
-        plt.close('all')
-        fold_num = i + 1
-        log_name="CV_" + str(fold_num) 
-        wandb.init(name=log_name, project=wandb_project, group=wandb_group, config = {'wandb_group':wandb_group}, tags=['summary'], reinit=True)
-
-        for _, flow in enumerate(workflow):
-            mode, _ = flow
-            df_all = raw_results_dict[mode]
-            df_test = df_all[df_all['amb'] == fold_num]
-
-            # Compute stats across all folds
-            log_vars = computeSummaryStats(df_test, num_class, mode)
-            wandb.log(log_vars)
-            df = pd.DataFrame(log_vars, index=[0])
-            results_table = results_table.append(df)
-
-            reg_fig_DBS, reg_fig_MEDS, con_mat_fig_normed, con_mat_fig = createSummaryPlots(df_test, num_class)
-            wandb.log({"confusion_matrix/" + mode + "_final_confusion_matrix.png": con_mat_fig})
-            wandb.log({"confusion_matrix/" + mode + "_final_confusion_matrix_normed.png": con_mat_fig_normed})
-            if mode == "test":
-                _, results_dict = compute_obj2_stats(df_all)
-                wandb.log(results_dict)
-
-                wandb.log({"regression_plot/"+ mode + "_final_regression_DBS.png": [wandb.Image(reg_fig_DBS)]})
-                wandb.log({"regression_plot/"+ mode + "_final_regression_MEDS.png": [wandb.Image(reg_fig_MEDS)]})
-
-
-    final_stats_variance(results_table, wandb_group, wandb_project, total_epochs, num_class, workflow)
-
-def set_up_results_table_objective_2():
-    col_names = []
-    ind = ['MEDS', 'DBS']
-    paired = ['unpaired']
-    direction = ['allwalks', 'forwardwalks', 'backwardwalks']
-    stat = ['tstatistic', 'pvalue', 'pos_num_samples', 'neg_num_samples', 'total_num_samples']
-
-    for i in ind:
-        for p in paired:
-            for d in direction:
-                for s in stat:
-                    col_names.append("_".join([i, p, d, s]))
-    print(col_names)
-    df = pd.DataFrame(columns=col_names)
-    return df
-
 
 
 def evaluate_model(
