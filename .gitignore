@@ -21,7 +21,7 @@ mmskeleton/wandb-summary.json
 
 *.out
 mmskeleton/mmskeleton/version.py
-
+sample_data/work_dir
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -124,3 +124,4 @@ ENV/
 .mypy_cache/
 
 
+mmcv/mmcv/runner/__pycache__/runner.cpython-37.pyc

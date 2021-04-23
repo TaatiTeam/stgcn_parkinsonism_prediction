@@ -138,7 +138,7 @@ def eval(
     os.environ["WANDB_RUN_GROUP"] = wandb_group
 
     # Load data from provided dataloaders
-    all_files_test, _, have_second_dataset = getAllInputFiles(dataset_cfg)
+    all_files_test, _, _ = getAllInputFiles(dataset_cfg)
 
 
     try:
@@ -178,11 +178,11 @@ def eval(
                 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, \
                 'wandb_group': wandb_group, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_2, \
                 'optimizer_cfg': optimizer_cfg_stage_2, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, \
-                'batch_size': batch_size, 'total_epochs': total_epochs }
+                'batch_size': batch_size, 'total_epochs': total_epochs , 'num_reps_pd': fold}
 
             model_cfg_local = copy.deepcopy(model_cfg)
             pretrained_model = initModel(model_cfg_local)
-            
+            continue
             # Evaluate the model on the finetuning task
             evaluate_model(work_dir_amb,
                         pretrained_model,
@@ -209,21 +209,21 @@ def eval(
                         path_to_saved_dataloaders, 
                         path_to_pretrained_model)
 
-            input('pause')
+            # input('pause')
     except Exception as e:
         logging.exception(e)
         print(e)
 
     # Calculate summary metrics
-    final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
+    # final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
+    computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
     
-
-    # # Delete the work_dir
-    # try:
-    #     shutil.rmtree(work_dir)
-    # except:
-    #     logging.exception('This: ')
-    #     print('failed to delete the work_dir folder: ', work_dir)
+    # Delete the work_dir
+    try:
+        shutil.rmtree(work_dir)
+    except:
+        logging.exception('This: ')
+        print('failed to delete the work_dir folder: ', work_dir)
 
 
 def final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv):
@@ -259,7 +259,6 @@ def final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, n
 
 
         df_all['demo_data_is_flipped'] = df_all.apply(label_flipped, axis=1)
-        # df_all['join_id'] = df_all.apply(generate_id_label_DBS, axis=1)
         raw_results_dict[mode] = copy.deepcopy(df_all)
 
 
@@ -326,168 +325,6 @@ def set_up_results_table_objective_2():
     df = pd.DataFrame(columns=col_names)
     return df
 
-def label_flipped(row):
-    if 'flipped' in row['walk_name']:
-        return 1
-    return 0
-
-def generate_id_label_DBS(row):
-    data = [row['amb'], row['demo_data_patient_ID'], row['demo_data_patient_ID'], row['demo_data_is_backward'], row['demo_data_is_flipped']] #, row['demo_data_DBS']]
-    data = [str(s) for s in data]
-    return "_".join(data)
-
-def createSummaryPlots(df_all, num_class):
-    true_labels = df_all['true_score']
-    preds = df_all['pred_round']
-    preds_raw = df_all['pred_raw']
-    class_names = [str(i) for i in range(num_class)]
-    try:
-        dbs_label = df_all['demo_data_DBS']
-        meds_label = df_all['demo_data_MEDS']
-    except:
-        dbs_label = [-1] * len(true_labels)
-        meds_label = [-1] * len(true_labels)
-
-    fig_title = "Regression for unseen participants - DBS"
-    reg_fig_DBS = regressionPlotByGroup(true_labels, preds_raw, class_names, fig_title, dbs_label)
-    fig_title = "Regression for unseen participants - MEDS"
-    reg_fig_MEDS = regressionPlotByGroup(true_labels, preds_raw, class_names, fig_title, meds_label)
-    con_mat_fig_normed = plot_confusion_matrix( true_labels,preds, class_names, num_class, True)
-    con_mat_fig= plot_confusion_matrix( true_labels,preds, class_names, num_class, False)
-
-    return reg_fig_DBS, reg_fig_MEDS, con_mat_fig_normed, con_mat_fig
-
-def computeSummaryStats(df_all, num_class, mode):
-    class_names_int = [int(i) for i in range(num_class)]
-
-    # Only use labelled walks to calculate metrics
-    true_labels = df_all.loc[df_all['true_score'] >= 0, 'true_score']
-    preds = df_all.loc[df_all['true_score'] >= 0, 'pred_round']
-    preds_raw = df_all.loc[df_all['true_score'] >= 0, 'pred_raw']
-
-    log_vars = {}
-     # Calculate the mean metrics across classes
-    average_types = ['macro', 'micro', 'weighted']
-    average_metrics_to_log = ['precision', 'recall', 'f1score', 'support']
-    prefix_name = mode + '/'
-    for av in average_types:
-        results_tuple = precision_recall_fscore_support(true_labels, preds, average=av)
-        for m in range(len(average_metrics_to_log)):      
-            log_vars[prefix_name +  average_metrics_to_log[m] +'_average_' + av] = results_tuple[m]
-
-
-    # Calculate metrics per class
-    results_tuple = precision_recall_fscore_support(true_labels, preds, average=None, labels=class_names_int)
-
-    for c in range(len(average_metrics_to_log)):
-        cur_metrics = results_tuple[c]
-        # print(cur_metrics)
-        for s in range(len(class_names_int)):
-            log_vars[prefix_name + str(class_names_int[s]) + '_'+ average_metrics_to_log[c]] = cur_metrics[s]
-
-
-    # Keep the original metrics for backwards compatibility
-    log_vars[prefix_name + 'mae_rounded'] = mean_absolute_error(true_labels, preds)
-    log_vars[prefix_name + 'mae_raw'] = mean_absolute_error(true_labels, preds_raw)
-    log_vars[prefix_name + 'accuracy'] = accuracy_score(true_labels, preds)
-
-    return log_vars
-
-def compute_obj2_stats(df_all):
-    results_df= {}
-    ind = ['MEDS', 'DBS']
-    paired = ['unpaired']
-    direction = {'allwalks': '', 'forwardwalks': 'forward', 'backwardwalks': 'backward'}
-    stat = ['tstatistic', 'pvalue', 'pos_num_samples', 'neg_num_samples', 'total_num_samples']
-
-
-    from scipy.stats import ttest_ind  
-    
-    def t_test(x,y,equal_var, alternative='less'):
-            double_t, double_p = ttest_ind(x,y, nan_policy='omit', equal_var = equal_var)
-            if alternative == 'both-sided':
-                pval = double_p
-            elif alternative == 'greater':
-                if np.mean(x) > np.mean(y):
-                    pval = double_p/2.
-                else:
-                    pval = 1.0 - double_p/2.
-            elif alternative == 'less':
-                if np.mean(x) < np.mean(y):
-                    pval = double_p/2.
-                else:
-                    pval = 1.0 - double_p/2.
-            return double_t, pval
-
-    for i in ind:
-        for p in paired:
-            for d in direction:
-
-                search_dir = direction[d]
-                demo_str = "demo_data_" + i
-                # Filter df_all to only extract walks of interest
-                test_df = df_all[df_all['walk_name'].str.contains(search_dir)]
-                test_df = test_df[test_df[demo_str] >= 0]
-
-                off_condition = test_df[test_df[demo_str] == 0]
-                on_condition = test_df[test_df[demo_str] == 1]
-                # print(off_condition)
-                # print(on_condition)
-
-                # comparison_df = off_condition.merge(
-                #     on_condition,
-                #     indicator=True,
-                #     how='inner', 
-                #     on='join_id'
-                # )
-                # # Set ipython's max row display
-                # pd.set_option('display.max_row', 1000)
-                # pd.set_option('display.max_colwidth', None)
-                # print(comparison_df)
-                # ids_unique = comparison_df.join_id.unique()
-                # print(len(ids_unique))
-                # print(comparison_df[comparison_df['join_id'] == ids_unique[0]]['walk_name_y'])
-                # # print(comparison_df[comparison_df['join_id'] == ids_unique[0]])
-                # if p is 'paired':
-                    
-                #     pass
-
-
-                off_condition_vals = off_condition['pred_raw'].to_list()
-                on_condition_vals = on_condition['pred_raw'].to_list()
-                import statistics
-                
-                # print(statistics.mean(off_condition_vals))
-                # print(statistics.mean(on_condition_vals))
-                # print(df_all)
-
-                tstat_welch, p_val_welch = t_test(on_condition_vals, off_condition_vals,equal_var=False) # welch
-                tstat_t, p_val_t = t_test(on_condition_vals, off_condition_vals,equal_var=True) # student's t-test
-                tstat_mw, p_val_mw = scipy.stats.mannwhitneyu(on_condition_vals, off_condition_vals, use_continuity=True, alternative='less') # mann whitney test
-
-
-
-                # Save values to df 
-                stat_base = "_".join([i, p, d])
-                results_df[stat_base + "_welch_tstatistic"] = tstat_welch
-                results_df[stat_base + "_welch_pvalue"] = p_val_welch
-                results_df[stat_base + "_t_tstatistic"] = tstat_t
-                results_df[stat_base + "_t_pvalue"] = p_val_t
-
-                results_df[stat_base + "_mannwhitney_tstatistic"] = tstat_mw
-                results_df[stat_base + "_mannwhitney_pvalue"] = p_val_mw
-
-                results_df[stat_base + "_pos_mean"] = statistics.mean(on_condition_vals)
-                results_df[stat_base + "_neg_mean"] = statistics.mean(off_condition_vals)
-                results_df[stat_base + "_pos_stdev"] = statistics.stdev(on_condition_vals)
-                results_df[stat_base + "_neg_stdev"] = statistics.stdev(off_condition_vals)
-                results_df[stat_base + "_pos_num_samples"] = len(on_condition)
-                results_df[stat_base + "_neg_num_samples"] = len(off_condition)
-                results_df[stat_base + "_total_num_samples"] = len(off_condition) + len(on_condition)
-                results_df[stat_base + "_pos_shapiro_teststat"],  results_df[stat_base + "_pos_shapiro_pval"]= scipy.stats.shapiro(on_condition_vals)
-                results_df[stat_base + "_neg_shapiro_teststat"],  results_df[stat_base + "_neg_shapiro_pval"]= scipy.stats.shapiro(off_condition_vals)
-
-    return pd.DataFrame(results_df, index=[0]), results_df
 
 
 def evaluate_model(
@@ -566,16 +403,15 @@ def evaluate_model(
         raise ValueError("Invalid loss" )
 
 
-
+    # Set up the MMCV runner object
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor, optimizer, work_dir, log_level, num_class=num_class, \
                     things_to_log=things_to_log, early_stopping=early_stopping, force_run_all_epochs=force_run_all_epochs, \
                     es_patience=es_patience, es_start_up=es_start_up, freeze_encoder=freeze_encoder, finetuning=True)
     runner.register_training_hooks(**training_hooks_local)
 
-    # run
+    # Evaluate the model
     runner.early_stop_eval(workflow, data_loaders, loss=loss, flip_loss_mult=flip_loss_mult, balance_classes=balance_classes, class_weights_dict=class_weights_dict)
-    # final_model, num_epoches_early_stop_finetune = runner.run(data_loaders, workflow, total_epochs, train_extrema_for_epochs=train_extrema_for_epochs, loss=loss, flip_loss_mult=flip_loss_mult, balance_classes=balance_classes, class_weights_dict=class_weights_dict)
     
     try:
         # Wait a bit so the WANDB thread can sync

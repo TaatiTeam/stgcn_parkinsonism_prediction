@@ -41,8 +41,7 @@ class ST_GCN_18_ordinal_smaller_2_position_pretrain(nn.Module):
                  use_gait_features=True,
                  **kwargs):
         super().__init__()
-        print('In ST_GCN_18 ordinal supcon: ', graph_cfg)
-        print(kwargs)
+
         self.use_gait_features = use_gait_features
         if not use_gait_features:
             gait_feat_num = 0
@@ -86,14 +85,8 @@ class ST_GCN_18_ordinal_smaller_2_position_pretrain(nn.Module):
         self.head = self.classification_head
         self.stage_2 = True
 
-        # print("encoder: ", self.encoder)
-        # print('projection head', self.head)
-
     def forward(self, x, gait_feats):
-        # print('input is of size: ', x.size())
         x = x[:, 0:self.in_channels, :, :, :]
-
-        # print('input is of size: ', x.size())
 
         # Fine-tuning
         if self.stage_2:
@@ -101,8 +94,6 @@ class ST_GCN_18_ordinal_smaller_2_position_pretrain(nn.Module):
 
             gait_feats = gait_feats.view(
                 gait_feats.size(0), gait_feats.size(1), 1, 1)
-            # print('shape of x before encoder is: ', x.size())
-            # print('shape of gait feature before encoder is: ', gait_feats.size())
 
             # If we have gait feaures, then combine at the feature level
             if self.use_gait_features:
@@ -116,20 +107,14 @@ class ST_GCN_18_ordinal_smaller_2_position_pretrain(nn.Module):
             x[x == float("-Inf")] = torch.finfo(x.dtype).min
             x[x == float("NaN")] = 0
 
-            # x = torch.clamp(x, min=-1, max=self.num_class)
 
         # Pretraining
         else:
-            # print("============================================")
-            # print('input is of size: ', x.size())
             x = self.encoder(x)
-
             x = self.head(x)
-            # print('shape of x before reshaping is: ', x.size())
             # reshape the output to be of size (13x2xnum_ts)
             x = x.view(x.size(0), self.in_channels,
                        self.num_joints_predicting, -1)
 
-            # print('shape of x after reshaping is: ', x.size())
 
         return x

@@ -33,8 +33,9 @@ processor_cfg:
   head: "stgcn"
   train_extrema_for_epochs: 25
   do_position_pretrain: True
-  model_save_root: "objective_2_detectron_apr9"  # This is where we look for and save pretrained models
-  resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"
+  model_save_root: "detectron_models"  # This is where we look for and save pretrained models
+  # resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"
+  resource_root: "/home/saboa/code/stgcn_parkinsonsim_prediction/sample_data"
 
   # model setting
   model_cfg:
@@ -58,8 +59,8 @@ processor_cfg:
     # data to evaluate on
     - type: "datasets.DataPipeline"
       data_source:
-        type: "datasets.SkeletonLoaderFasano"
-        data_dir: fasano_detectron
+        type: "datasets.SkeletonLoaderTRI"
+        data_dir: tri_detectron/stgcn_normalized_100_center_pd_no_norm
         use_gait_feats: False
         num_track: 1
         num_keypoints: 13
