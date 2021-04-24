@@ -35,6 +35,45 @@ turn_off_weight_decay = False       # Keep as False to use the configuration fro
 log_incrementally = True
 log_code = False
 
+
+def train_simple(
+        work_dir,
+        model_cfg,
+        loss_cfg,
+        dataset_cfg,
+        optimizer_cfg,
+        batch_size,
+        total_epochs,
+        training_hooks,
+        workflow=[('train', 1)],
+        gpus=1,
+        log_level=0,
+        workers=4,
+        resume_from=None,
+        load_from=None,
+        cv=5,
+        exclude_cv=False,
+        notes=None,
+        model_save_root='None',
+        flip_loss=0,
+        weight_classes=False,
+        group_notes='',
+        launch_from_local=True,
+        wandb_project="mmskel",
+        early_stopping=False,
+        force_run_all_epochs=True,
+        es_patience_1=5,
+        es_start_up_1=5,
+        es_patience_2=10,
+        es_start_up_2=50,
+        train_extrema_for_epochs=0,
+        head='stgcn',
+        freeze_encoder=True,
+        do_position_pretrain=True,
+        resource_root='.',
+):
+    print("train_simple")
+
 def eval(
         work_dir,
         model_cfg,
@@ -224,6 +263,7 @@ def eval(
         print('failed to delete the work_dir folder: ', work_dir)
 
 
+
 def evaluate_model(
         work_dir,
         model,
@@ -318,7 +358,6 @@ def evaluate_model(
         print('failed to delete the wandb folder')    
     
 
-
 def finetune_model(
         work_dir,
         model,
@@ -361,7 +400,7 @@ def finetune_model(
     load_data = True
     base_dl_path = os.path.join(path_to_saved_dataloaders, 'finetuning') 
     full_dl_path = os.path.join(base_dl_path, 'dataloaders_fine.pt')
-    print("expecting dataloaders here:", full_dl_path)
+    print(f"expecting dataloaders here: {full_dl_path}")
     os.makedirs(base_dl_path, exist_ok=True) 
 
     if os.path.isfile(full_dl_path) and not eval_only:
@@ -381,7 +420,8 @@ def finetune_model(
                                         drop_last=False)
     
         input(train_dataloader)
-        # Normalize by the train scaler
+
+        # Normalize the val and test sets by the train set scaler
         for d in datasets[1:]:
             d['data_source']['fit_scaler'] = train_dataloader.dataset.get_fit_scaler()
             d['data_source']['scaler'] = train_dataloader.dataset.get_scaler()
@@ -397,9 +437,9 @@ def finetune_model(
         data_loaders.insert(0, train_dataloader) # insert the train dataloader
         data_loaders[0].dataset.data_source.sample_extremes = True
 
-        if not eval_only:
-            # Save for next time
-            torch.save(data_loaders, full_dl_path)
+
+        # Save for next time
+        torch.save(data_loaders, full_dl_path)
         
 
     workflow = [tuple(w) for w in workflow]
@@ -412,11 +452,9 @@ def finetune_model(
     set_seed(0)
     model.module.set_classification_head_size(data_loaders[-1].dataset.data_source.get_num_gait_feats())
     model.module.set_stage_2()
-    # print(data_loaders[-1].dataset.data_source.get_num_gait_feats())
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    # input(model)
     set_seed(0)
 
     loss_cfg_local = copy.deepcopy(loss_cfg)
@@ -428,7 +466,6 @@ def finetune_model(
     except:
         print(loss)
 
-    # print('training hooks: ', training_hooks_local)
     # build runner
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor, optimizer, work_dir, log_level, num_class=num_class, \
@@ -446,6 +483,7 @@ def finetune_model(
     except:
         print('failed to delete the wandb folder')    
     
+    # Save the trained model
     if path_to_pretrained_model is not None:
         checkpoint_file = os.path.join(path_to_pretrained_model, 'checkpoint_final.pt')
         torch.save(final_model.module.state_dict(), checkpoint_file)
@@ -488,18 +526,10 @@ def pretrain_model(
     optimizer_cfg_local = copy.deepcopy(optimizer_cfg)
 
 
-
     # init model to return
     model = initModel(model_cfg_local)
 
-    # print("the model is: ", model)
 
-    # print("These are the model parameters:")
-    # for param in model.parameters():
-    #     print(param.data)
-
-
-    print("path_to_pretrained_model===============================================================", path_to_pretrained_model)
     if not do_position_pretrain:
         print("SKIPPING PRETRAINING-------------------")
         model = MMDataParallel(model, device_ids=range(gpus)).cuda()
@@ -510,7 +540,7 @@ def pretrain_model(
         if os.path.isfile(checkpoint_file):
             print(checkpoint_file)
 
-            # Only copy over the ST-GCN layer from this model
+            # Only copy over the ST-GCN backbone from this model (not the final layers)
             model_state = model.state_dict()
 
             pretrained_state = torch.load(checkpoint_file)
@@ -519,8 +549,6 @@ def pretrain_model(
 
             model_state.update(pretrained_state)
             model.load_state_dict(model_state)
-            # input(model.use_gait_features)
-
             model = MMDataParallel(model, device_ids=range(gpus)).cuda()
 
             return model
@@ -560,10 +588,6 @@ def pretrain_model(
     global balance_classes
     global class_weights_dict
 
-    # if balance_classes:
-    #     dataset_train = call_obj(**datasets[0])
-    #     class_weights_dict = dataset_train.data_source.class_dist
-
 
     torch.cuda.set_device(0)
     loss = call_obj(**loss_cfg_local)
@@ -571,9 +595,7 @@ def pretrain_model(
 
     visualize_preds = {'visualize': False, 'epochs_to_visualize': ['first', 'last'], 'output_dir': os.path.join('.', simple_work_dir_amb)}
 
-    # print('training hooks: ', training_hooks_local)
     # build runner
-    # loss = SupConLoss()
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor_position_pretraining, optimizer, work_dir, log_level, \
                     things_to_log=things_to_log, early_stopping=early_stopping, force_run_all_epochs=force_run_all_epochs, \
@@ -582,7 +604,6 @@ def pretrain_model(
 
     # run
     workflow = [tuple(w) for w in workflow]
-    # [('train', 5), ('val', 1)]
     pretrained_model, _ = runner.run(data_loaders, workflow, total_epochs, loss=loss, supcon_pretraining=True)
     
     try:
@@ -590,12 +611,9 @@ def pretrain_model(
     except:
         print('failed to delete the wandb folder')
 
-    # print(pretrained_model)
-    # input('model')
     if path_to_pretrained_model is not None:
         torch.save(pretrained_model.module.state_dict(), checkpoint_file)
 
-        # input('saved')
     return pretrained_model
 
 
@@ -631,14 +649,14 @@ def batch_processor_position_pretraining(model, datas, train_mode, loss, num_cla
     predicted_joint_positions = model(data_all, gait_features_all)
 
     if torch.sum(predicted_joint_positions) == 0:        
-        raise ValueError("=============================== got all zero output...")
+        raise ValueError("got all zero output...")
 
 
-    # Calculate the supcon loss for this data
+    # Calculate the loss for this data
     try:
         batch_loss = loss(predicted_joint_positions, label)
     except Exception as e:
-        logging.exception("loss calc message=================================================")
+        logging.exception("Failed to calculate the loss")
 
     preds = []
     raw_preds = []
