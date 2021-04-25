@@ -35,6 +35,326 @@ turn_off_weight_decay = False       # Keep as False to use the configuration fro
 log_incrementally = True
 log_code = False
 
+
+def train_simple(
+        work_dir,
+        model_cfg,
+        loss_cfg,
+        dataset_cfg,
+        optimizer_cfg,
+        batch_size,
+        total_epochs,
+        training_hooks,
+        workflow=[('train', 1)],
+        gpus=1,
+        log_level=0,
+        workers=4,
+        resume_from=None,
+        load_from=None,
+        cv=5,
+        exclude_cv=False,
+        notes=None,
+        model_save_root='None',
+        flip_loss=0,
+        weight_classes=False,
+        group_notes='',
+        launch_from_local=True,
+        wandb_project="mmskel",
+        early_stopping=False,
+        force_run_all_epochs=True,
+        es_patience_1=5,
+        es_start_up_1=5,
+        es_patience_2=10,
+        es_start_up_2=50,
+        train_extrema_for_epochs=0,
+        head='stgcn',
+        freeze_encoder=True,
+        do_position_pretrain=True,
+        resource_root='.',
+):
+    # Reproductibility
+    set_seed(0)
+    print("==================================")
+    print('have cuda: ', torch.cuda.is_available())
+    print('using device: ', torch.cuda.get_device_name())
+    
+    # Update globals
+    updateGlobals(flip_loss, weight_classes, model_cfg['num_class'])
+    updateWeightDecay(turn_off_weight_decay, optimizer_cfg)
+
+    # Format data loaders
+    if isinstance(dataset_cfg, dict):
+        dataset_cfg = [dataset_cfg]
+
+    assert len(dataset_cfg) == 2, 'In train mode, need to provide two elements in dataset_cfg.'
+
+    # Set up for logging 
+    outcome_label = dataset_cfg[0]['data_source']['outcome_label']
+    eval_pipeline = setup_eval_pipeline(dataset_cfg[1]['pipeline'])
+
+
+    if log_code:
+        os.environ['WANDB_DISABLE_CODE'] = 'false'
+    else:
+        os.environ['WANDB_DISABLE_CODE'] = 'true'
+
+
+    # Add the wandb group to work_dir to prevent conflicts if running multiple repetitions of the same configuration
+    model_type = get_model_type(model_cfg)
+    group_notes = model_type + '_pretrain15' + "_dropout" + str(model_cfg['dropout']) + '_tempkernel' + str(model_cfg['temporal_kernel_size']) + "_batch" + str(batch_size)
+    wandb_local_id = wandb.util.generate_id()
+    wandb_group = wandb_local_id + "_" + outcome_label + "_" + group_notes
+
+    # Check if we should use gait features
+    if 'use_gait_feats' in dataset_cfg[1]['data_source']:
+        model_cfg['use_gait_features'] = dataset_cfg[1]['data_source']['use_gait_feats']
+
+    for ds in dataset_cfg:
+        ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
+        ds['data_source']['data_dir'] = os.path.join(local_data_base, ds['data_source']['data_dir'])
+
+    # Set the paths for input and output
+    work_dir = os.path.join(resource_root, work_dir, wandb_group)
+    wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
+    model_zoo_root = os.path.join(resource_root, 'model_zoo')
+    dataloader_temp = os.path.join(resource_root, 'dataloaders')
+    local_data_base = os.path.join(resource_root, 'data')
+
+
+    os.makedirs(work_dir)
+    os.environ["WANDB_RUN_GROUP"] = wandb_group
+
+    # Load data from provided dataloaders
+    first_dataset, second_dataset, have_second_dataset = getAllInputFiles(dataset_cfg)
+
+
+
+
+
+
+    try:
+        plt.close('all')
+        test_walks = all_files_test
+        non_test_walks_all = all_files
+
+
+
+        # data exploration
+        print(f"test_walks: {len(test_walks)}")
+        print(f"non_test_walks: {len(non_test_walks_all)}")
+
+
+        # Split the non_test walks into train/val
+        kf = KFold(n_splits=cv, shuffle=True, random_state=1)
+        kf.get_n_splits(non_test_walks_all)
+
+
+
+        # This loop is for pretraining
+        num_reps = 1
+        for train_ids, val_ids in kf.split(non_test_walks_all):
+            plt.close('all')
+            test_id = num_reps
+            num_reps += 1
+
+            # Divide all of the data into train/val
+            train_walks = [non_test_walks_all[i] for i in train_ids]
+            val_walks = [non_test_walks_all[i] for i in val_ids]
+
+            datasets = [copy.deepcopy(dataset_cfg[0]) for i in range(len(workflow))]
+            datasets[2] = copy.deepcopy(dataset_cfg[1])
+            datasets[2]['pipeline'] = copy.deepcopy(dataset_cfg[0]['pipeline'])
+            # datasets[2]['data_source']['use_gait_feats'] = False # Don't use gait features for pretraining
+
+            for ds in datasets:
+                ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
+
+            print(datasets)
+            # input('a')
+            # ================================ STAGE 1 ====================================
+            # Stage 1 training
+            datasets[0]['data_source']['data_dir'] = train_walks
+            datasets[1]['data_source']['data_dir'] = val_walks
+            datasets[2]['data_source']['data_dir'] = test_walks
+
+            if fast_dev:
+                datasets[0]['data_source']['data_dir'] = train_walks[:num_walks_in_fast]
+                datasets[1]['data_source']['data_dir'] = val_walks[:num_walks_in_fast]
+                datasets[2]['data_source']['data_dir'] = test_walks[:100]
+
+
+            workflow_stage_1 = copy.deepcopy(workflow)
+            loss_cfg_stage_1 = copy.deepcopy(loss_cfg[0])
+            optimizer_cfg_stage_1 = optimizer_cfg[0]
+
+            print('optimizer_cfg_stage_1 ', optimizer_cfg_stage_1)
+
+            work_dir_amb = work_dir + "/" + str(test_id)
+            simple_work_dir_amb = simple_work_dir + "/" + str(test_id)
+
+            things_to_log = {'num_ts_predicting': model_cfg['num_ts_predicting'], 'es_start_up_1': es_start_up_1, 'es_patience_1': es_patience_1, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': num_reps, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_1, 'optimizer_cfg': optimizer_cfg_stage_1, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
+
+
+            print('stage_1_train: ', len(train_walks))
+            print('stage_1_val: ', len(val_walks))
+            print('stage_1_test: ', len(test_walks))
+
+            # path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, dataset_cfg[0]['data_source']['outcome_label'], model_type, \
+            #                                         str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(test_id))
+
+            # Pretrain doesnt depend on the outcome label
+            path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
+                                                    str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(test_id))
+
+
+            load_all = flip_loss != 0
+            load_all = False  # Hold over, this is just for location of dataloaders
+            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, str(num_reps), \
+                                                    "load_all" + str(load_all), "gait_feats_" + str(model_cfg['use_gait_features']), str(test_id))
+            
+
+            print('path_to_pretrained_model', path_to_pretrained_model)
+            if not os.path.exists(path_to_pretrained_model):
+                os.makedirs(path_to_pretrained_model)
+
+
+            pretrained_model = pretrain_model(
+                work_dir_amb,
+                simple_work_dir_amb,
+                model_cfg,
+                loss_cfg_stage_1,
+                datasets,
+                optimizer_cfg_stage_1,
+                batch_size,
+                total_epochs,
+                training_hooks,
+                workflow_stage_1,
+                gpus,
+                log_level,
+                workers,
+                resume_from,
+                load_from, 
+                things_to_log,
+                early_stopping,
+                force_run_all_epochs,
+                es_patience_1,
+                es_start_up_1, 
+                do_position_pretrain, 
+                path_to_pretrained_model, 
+                path_to_saved_dataloaders
+                )
+
+
+        
+
+
+
+            # ================================ STAGE 2 ====================================
+            # Make sure we're using the correct dataset
+            for ds in datasets:
+                ds['pipeline'] = dataset_cfg[1]['pipeline']
+                ds['data_source']['use_gait_feats'] = dataset_cfg[1]['data_source']['use_gait_feats']
+
+
+            # datasets = [copy.deepcopy(dataset_cfg[0]) for i in range(len(workflow))]
+            # datasets[2] = dataset_cfg[1]
+
+            # for ds in datasets:
+            #     ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
+
+
+            # # Stage 2 training
+            # datasets[0]['data_source']['data_dir'] = train_walks
+            # datasets[1]['data_source']['data_dir'] = val_walks
+            # datasets[2]['data_source']['data_dir'] = test_walks
+
+
+            # if fast_dev:
+            #     datasets[0]['data_source']['data_dir'] = train_walks[:50]
+            #     datasets[1]['data_source']['data_dir'] = val_walks[:50]
+            #     datasets[2]['data_source']['data_dir'] = test_walks[:50]
+
+
+            # Don't shear or scale the test or val data (also always just take the middle 120 crop)
+            datasets[1]['pipeline'] = eval_pipeline
+            datasets[2]['pipeline'] = eval_pipeline
+
+            optimizer_cfg_stage_2 = optimizer_cfg[1]
+            loss_cfg_stage_2 = copy.deepcopy(loss_cfg[1])
+
+            print('optimizer_cfg_stage_2 ', optimizer_cfg_stage_2)
+
+                
+            # if we don't want to use the pretrained head, reset to norm init
+            if not pretrain_model:
+                pretrained_model.module.encoder.apply(weights_init_xavier)
+
+            # Reset the head for finetuning
+            pretrained_model.module.set_stage_2()
+            pretrained_model.module.head.apply(weights_init_xavier)
+
+            things_to_log = {'do_position_pretrain': do_position_pretrain, 'num_reps_pd': test_id, 'train_extrema_for_epochs': train_extrema_for_epochs, 'supcon_head': head, 'freeze_encoder': freeze_encoder, 'es_start_up_2': es_start_up_2, 'es_patience_2': es_patience_2, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': test_id, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_2, 'optimizer_cfg': optimizer_cfg_stage_2, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
+
+            # print("final model for fine_tuning is: ", pretrained_model)
+            # input("here: " + work_dir_amb)
+            # print("starting finetuning", "*" *100)
+            for ds in datasets:
+                print(ds['pipeline'])
+            # input('before stage 2')
+            _, num_epochs = finetune_model(work_dir_amb,
+                        pretrained_model,
+                        loss_cfg_stage_2,
+                        datasets,
+                        optimizer_cfg_stage_2,
+                        batch_size,
+                        total_epochs,
+                        training_hooks,
+                        workflow,
+                        gpus,
+                        log_level,
+                        workers,
+                        resume_from,
+                        load_from,
+                        things_to_log,
+                        early_stopping,
+                        force_run_all_epochs,
+                        es_patience_2,
+                        es_start_up_2, 
+                        freeze_encoder, 
+                        num_class,
+                        train_extrema_for_epochs, 
+                        path_to_saved_dataloaders, 
+                        path_to_pretrained_model)
+
+
+
+        # Done CV
+        try:
+            # robust_rmtree(work_dir_amb)
+            print('failed to delete the participant folder')
+
+        except:
+            print('failed to delete the participant folder')
+
+    except TooManyRetriesException:
+        print("CAUGHT TooManyRetriesException - something is very wrong. Stopping")
+        # sync_wandb(wandb_log_local_group)
+
+    except:
+        logging.exception("this went wrong")
+        # Done with this participant, we can delete the temp foldeer
+        try:
+            # robust_rmtree(work_dir_amb)
+            print('failed to delete the participant folder')
+
+        except:
+            print('failed to delete the participant folder')
+
+
+
+
+    final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
+
 def eval(
         work_dir,
         model_cfg,
@@ -77,20 +397,9 @@ def eval(
     print('have cuda: ', torch.cuda.is_available())
     print('using device: ', torch.cuda.get_device_name())
     
-
     # Update globals
-    global flip_loss_mult
-    flip_loss_mult = flip_loss
-
-    global balance_classes
-    balance_classes = weight_classes
-
-    global num_class
-    num_class = model_cfg['num_class']
-    
-    if turn_off_weight_decay:
-        for stage in range(len(optimizer_cfg)):
-            optimizer_cfg[stage]['weight_decay'] = 0
+    updateGlobals(flip_loss, weight_classes, model_cfg['num_class'])
+    updateWeightDecay(turn_off_weight_decay, optimizer_cfg)
 
 
     # Format data loaders
@@ -115,7 +424,6 @@ def eval(
     group_notes = model_type + '_pretrain15' + "_dropout" + str(model_cfg['dropout']) + '_tempkernel' + str(model_cfg['temporal_kernel_size']) + "_batch" + str(batch_size)
     wandb_local_id = wandb.util.generate_id()
     wandb_group = wandb_local_id + "_" + outcome_label + "_" + group_notes
-    work_dir = os.path.join(work_dir, wandb_group)
 
     # Check if we should use gait features
     if 'use_gait_feats' in dataset_cfg[0]['data_source']:
@@ -123,28 +431,26 @@ def eval(
 
     for ds in dataset_cfg:
         ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
+        ds['data_source']['data_dir'] = os.path.join(local_data_base, ds['data_source']['data_dir'])
 
     # Set the paths for input and output
-    work_dir = os.path.join(resource_root, work_dir)
+    work_dir = os.path.join(resource_root, work_dir, wandb_group)
     wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
     model_zoo_root = os.path.join(resource_root, 'model_zoo')
     dataloader_temp = os.path.join(resource_root, 'dataloaders')
     local_data_base = os.path.join(resource_root, 'data')
-    for i in range(len(dataset_cfg)):
-        dataset_cfg[i]['data_source']['data_dir'] = os.path.join(local_data_base, dataset_cfg[i]['data_source']['data_dir'])
 
-
+    
+    
     os.makedirs(work_dir)
     os.environ["WANDB_RUN_GROUP"] = wandb_group
 
     # Load data from provided dataloaders
-    all_files_test, _, _ = getAllInputFiles(dataset_cfg)
+    test_walks, _, _ = getAllInputFiles(dataset_cfg)
 
 
     try:
         plt.close('all')
-        test_walks = all_files_test
-
 
         for fold in range(1, cv + 1):
             path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
@@ -222,6 +528,7 @@ def eval(
     except:
         logging.exception('This: ')
         print('failed to delete the work_dir folder: ', work_dir)
+
 
 
 def evaluate_model(
@@ -318,7 +625,6 @@ def evaluate_model(
         print('failed to delete the wandb folder')    
     
 
-
 def finetune_model(
         work_dir,
         model,
@@ -361,7 +667,7 @@ def finetune_model(
     load_data = True
     base_dl_path = os.path.join(path_to_saved_dataloaders, 'finetuning') 
     full_dl_path = os.path.join(base_dl_path, 'dataloaders_fine.pt')
-    print("expecting dataloaders here:", full_dl_path)
+    print(f"expecting dataloaders here: {full_dl_path}")
     os.makedirs(base_dl_path, exist_ok=True) 
 
     if os.path.isfile(full_dl_path) and not eval_only:
@@ -381,7 +687,8 @@ def finetune_model(
                                         drop_last=False)
     
         input(train_dataloader)
-        # Normalize by the train scaler
+
+        # Normalize the val and test sets by the train set scaler
         for d in datasets[1:]:
             d['data_source']['fit_scaler'] = train_dataloader.dataset.get_fit_scaler()
             d['data_source']['scaler'] = train_dataloader.dataset.get_scaler()
@@ -397,9 +704,9 @@ def finetune_model(
         data_loaders.insert(0, train_dataloader) # insert the train dataloader
         data_loaders[0].dataset.data_source.sample_extremes = True
 
-        if not eval_only:
-            # Save for next time
-            torch.save(data_loaders, full_dl_path)
+
+        # Save for next time
+        torch.save(data_loaders, full_dl_path)
         
 
     workflow = [tuple(w) for w in workflow]
@@ -412,11 +719,9 @@ def finetune_model(
     set_seed(0)
     model.module.set_classification_head_size(data_loaders[-1].dataset.data_source.get_num_gait_feats())
     model.module.set_stage_2()
-    # print(data_loaders[-1].dataset.data_source.get_num_gait_feats())
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    # input(model)
     set_seed(0)
 
     loss_cfg_local = copy.deepcopy(loss_cfg)
@@ -428,7 +733,6 @@ def finetune_model(
     except:
         print(loss)
 
-    # print('training hooks: ', training_hooks_local)
     # build runner
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor, optimizer, work_dir, log_level, num_class=num_class, \
@@ -446,6 +750,7 @@ def finetune_model(
     except:
         print('failed to delete the wandb folder')    
     
+    # Save the trained model
     if path_to_pretrained_model is not None:
         checkpoint_file = os.path.join(path_to_pretrained_model, 'checkpoint_final.pt')
         torch.save(final_model.module.state_dict(), checkpoint_file)
@@ -488,18 +793,10 @@ def pretrain_model(
     optimizer_cfg_local = copy.deepcopy(optimizer_cfg)
 
 
-
     # init model to return
     model = initModel(model_cfg_local)
 
-    # print("the model is: ", model)
 
-    # print("These are the model parameters:")
-    # for param in model.parameters():
-    #     print(param.data)
-
-
-    print("path_to_pretrained_model===============================================================", path_to_pretrained_model)
     if not do_position_pretrain:
         print("SKIPPING PRETRAINING-------------------")
         model = MMDataParallel(model, device_ids=range(gpus)).cuda()
@@ -510,7 +807,7 @@ def pretrain_model(
         if os.path.isfile(checkpoint_file):
             print(checkpoint_file)
 
-            # Only copy over the ST-GCN layer from this model
+            # Only copy over the ST-GCN backbone from this model (not the final layers)
             model_state = model.state_dict()
 
             pretrained_state = torch.load(checkpoint_file)
@@ -519,8 +816,6 @@ def pretrain_model(
 
             model_state.update(pretrained_state)
             model.load_state_dict(model_state)
-            # input(model.use_gait_features)
-
             model = MMDataParallel(model, device_ids=range(gpus)).cuda()
 
             return model
@@ -560,10 +855,6 @@ def pretrain_model(
     global balance_classes
     global class_weights_dict
 
-    # if balance_classes:
-    #     dataset_train = call_obj(**datasets[0])
-    #     class_weights_dict = dataset_train.data_source.class_dist
-
 
     torch.cuda.set_device(0)
     loss = call_obj(**loss_cfg_local)
@@ -571,9 +862,7 @@ def pretrain_model(
 
     visualize_preds = {'visualize': False, 'epochs_to_visualize': ['first', 'last'], 'output_dir': os.path.join('.', simple_work_dir_amb)}
 
-    # print('training hooks: ', training_hooks_local)
     # build runner
-    # loss = SupConLoss()
     optimizer = call_obj(params=model.parameters(), **optimizer_cfg_local)
     runner = Runner(model, batch_processor_position_pretraining, optimizer, work_dir, log_level, \
                     things_to_log=things_to_log, early_stopping=early_stopping, force_run_all_epochs=force_run_all_epochs, \
@@ -582,7 +871,6 @@ def pretrain_model(
 
     # run
     workflow = [tuple(w) for w in workflow]
-    # [('train', 5), ('val', 1)]
     pretrained_model, _ = runner.run(data_loaders, workflow, total_epochs, loss=loss, supcon_pretraining=True)
     
     try:
@@ -590,12 +878,9 @@ def pretrain_model(
     except:
         print('failed to delete the wandb folder')
 
-    # print(pretrained_model)
-    # input('model')
     if path_to_pretrained_model is not None:
         torch.save(pretrained_model.module.state_dict(), checkpoint_file)
 
-        # input('saved')
     return pretrained_model
 
 
@@ -631,14 +916,14 @@ def batch_processor_position_pretraining(model, datas, train_mode, loss, num_cla
     predicted_joint_positions = model(data_all, gait_features_all)
 
     if torch.sum(predicted_joint_positions) == 0:        
-        raise ValueError("=============================== got all zero output...")
+        raise ValueError("got all zero output...")
 
 
-    # Calculate the supcon loss for this data
+    # Calculate the loss for this data
     try:
         batch_loss = loss(predicted_joint_positions, label)
     except Exception as e:
-        logging.exception("loss calc message=================================================")
+        logging.exception("Failed to calculate the loss")
 
     preds = []
     raw_preds = []
@@ -654,3 +939,20 @@ def batch_processor_position_pretraining(model, datas, train_mode, loss, num_cla
     outputs = dict(predicted_joint_positions=predicted_joint_positions, loss=batch_loss, log_vars=log_vars, num_samples=num_valid_samples, demo_data=demo_data)
 
     return outputs, output_labels, batch_loss.item()
+
+
+def updateGlobals(flip_loss, weight_classes, num_class_local):
+    # Update globals
+    global flip_loss_mult
+    flip_loss_mult = flip_loss
+
+    global balance_classes
+    balance_classes = weight_classes
+
+    global num_class
+    num_class = num_class_local
+
+def updateWeightDecay(turn_off_weight_decay, optimizer_cfg):
+    if turn_off_weight_decay:
+        for stage in range(len(optimizer_cfg)):
+            optimizer_cfg[stage]['weight_decay'] = 0

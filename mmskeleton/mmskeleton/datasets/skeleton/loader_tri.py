@@ -474,7 +474,7 @@ class SkeletonLoaderTRI(torch.utils.data.Dataset):
         flipped_data['index'] = flip_index
 
         # Add to extrema list if this score is on the extremes
-        if isExtrema(self, data['category_id']):
+        if self.isExtrema(data['category_id']):
             self.cached_extreme_inds.append(index)
 
         if self.cache:

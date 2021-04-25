@@ -489,14 +489,10 @@ class Runner(object):
             self.visualize_preds_func(outputs, data_batch)
 
 
-
-            # If we get a nan in the loss, just ignore it
-            # print("overall loss is: ", overall_loss)
             try:
                 overall_loss_np = overall_loss.cpu().data.numpy()
             except: 
                 overall_loss_np = overall_loss
-                # print("our loss is: ", overall_loss_np)
             self.visualize_preds_func(outputs, data_batch)
 
 
@@ -528,10 +524,7 @@ class Runner(object):
             self._iter += 1
         self._epoch += 1
 
-        # true_labels, predicted_labels = self.remove_non_labelled_data(true_labels, predicted_labels)
-        # print(len(true_labels), true_labels)
-        # print(len(predicted_labels), predicted_labels)
-        # print("true_labels: ", true_labels)
+
         batch_loss = batch_loss / len(true_labels)
 
         if not self.pretrain_mode:
@@ -612,7 +605,6 @@ class Runner(object):
             self.raw_labels = raw_labels
             self.non_pseudo_label = non_pseudo_label
 
-        # print('labels', true_labels, 'preds', predicted_labels)
 
         if self.early_stopping and not self.early_stopping_obj.early_stop and self.epoch >= self.es_start_up:
             self.es_before_step = self.early_stopping_obj.early_stop
@@ -637,7 +629,6 @@ class Runner(object):
         else:
             self.call_hook('after_val_epoch')
 
-        # print("done val epoch")
         return true_labels, predicted_labels
 
 
@@ -663,10 +654,8 @@ class Runner(object):
                 try:
                     raw_labels.extend(raw['raw_labels'])
                     non_pseudo_label.extend(raw['non_pseudo_label'])
-
                 except:
                     pass
-
 
                 try:
                     demo_data_batch = outputs['demo_data']
@@ -678,12 +667,10 @@ class Runner(object):
                 except:
                     pass
 
-
                 try:
                     overall_loss_np = overall_loss.cpu().data.numpy()
                 except: 
                     overall_loss_np = overall_loss
-                    # print("our loss is: ", overall_loss_np)
                 self.visualize_preds_func(outputs, data_batch)
 
                 if not np.isnan(overall_loss_np):
@@ -783,8 +770,7 @@ class Runner(object):
                     batch_loss += overall_loss*len(raw['true'])
                     self.visualize_preds_func(outputs, data_batch, True)
                 except:
-                    print(raw)
-                    input("790")
+                    pass
 
                 try:
                     demo_data_batch = outputs['demo_data']
@@ -828,9 +814,7 @@ class Runner(object):
 
 
     def early_stop_eval_pretrain(self, es_checkpoint, workflow, data_loaders, **kwargs):
-        print('early_stop_eval_pretrain============================')
-        # input('early_stop_eval_pretrain')
-        # self.model.load_state_dict(torch.load(es_checkpoint))
+
         self.model.eval()
         for i, flow in enumerate(workflow):  # Should only have test in the workflow
             self.mode, _ = flow
@@ -840,9 +824,6 @@ class Runner(object):
 
 
         return predicted_joint_positions, last_joint_position, true_future_joint_positions, predicted_joint_positions_ref, last_joint_position_ref, true_future_joint_positions_ref, names
-        # print('true', len(predicted_joint_positions))
-        # print('true', len(names))
-        # input('results--------')
 
 
     def eval_pretrain(self, data_loaders, workflow, max_epochs, **kwargs):
@@ -1030,11 +1011,6 @@ class Runner(object):
                 except Exception as e: 
                     print("This is the error we got _ 2:", e)
 
-                # Need to delete the wandb and work_dir folder to avoid filling up the cluster with files
-                # try:
-                #     shutil.rmtree(wandb.run.dir)
-                # except:
-                #     print('failed to delete the wandb folder')
 
                 try:
                     shutil.rmtree(self.work_dir)
@@ -1052,13 +1028,10 @@ class Runner(object):
         if self.early_stopping:
             try:
                 self.log_buffer.update({'early_stop_epoch': self.early_stopping_epoch}, 1) 
-
                 print('stopped at epoch: ', self.early_stopping_epoch)
             except:
                 print("didn't meet early stopping criterion so we ran for all epochs")
             print("*****************************now doing eval: ")
-            print("workflow", workflow)
-            print("data_loaders", data_loaders)
 
             if not self.pretrain_mode:
                 self.model.load_state_dict(torch.load(es_checkpoint))
@@ -1119,17 +1092,9 @@ class Runner(object):
                 for num in range(len(all_data['all_true'])):
                     core_data = [amb, names[num], num_ts[num], all_data['all_true'][num], all_data['all_pred_round'][num], all_data['all_pred_raw'][num]]
                     for k in demo_data:
-                        # print(len(all_data['all_true']))
-                        # print(len(all_data['all_pred']))
-                        # print(len(predicted_labels))
-                        # print(len(raw_preds))
-                        # print(len(names))
-                        # input(len(demo_data[k]))
-
                         core_data.append(demo_data[k][num])
 
                     writer.writerow(core_data)
-        # input('done saving to files')
 
 
     def register_lr_hook(self, lr_config):
