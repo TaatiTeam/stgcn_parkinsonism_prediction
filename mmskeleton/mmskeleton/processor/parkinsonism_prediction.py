@@ -22,7 +22,7 @@ import scipy
 
 
 # When developing/testing, we can save time by only loading in a subset of the data
-fast_dev = True                    # Should be False to evaluate on entire dataset
+fast_dev = False                    # Should be False to evaluate on entire dataset
 num_walks_in_fast = 50
 
 
@@ -113,7 +113,7 @@ def train_simple(
     work_dir = os.path.join(resource_root, work_dir, wandb_group)
     wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
     model_zoo_root = os.path.join(resource_root, 'model_zoo')
-    dataloader_temp = os.path.join(resource_root, 'dataloaders')
+    dataloader_temp = os.path.join(resource_root, 'data_loaders')
     local_data_base = os.path.join(resource_root, 'data')
 
     for ds in dataset_cfg:
@@ -146,9 +146,9 @@ def train_simple(
             if not os.path.exists(path_to_pretrained_model):
                 os.makedirs(path_to_pretrained_model)
 
-
-            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, str(fold), \
-                                                    "fast_dev" + str(fast_dev), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
+            load_all = not fast_dev
+            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, \
+                                                    "load_all_" + str(load_all), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
 
                         
             work_dir_amb = work_dir + "/" + str(fold)
@@ -364,7 +364,7 @@ def eval(
     work_dir = os.path.join(resource_root, work_dir, wandb_group)
     wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
     model_zoo_root = os.path.join(resource_root, 'model_zoo')
-    dataloader_temp = os.path.join(resource_root, 'dataloaders')
+    dataloader_temp = os.path.join(resource_root, 'data_loaders')
     local_data_base = os.path.join(resource_root, 'data')
 
     for ds in dataset_cfg:
@@ -386,9 +386,9 @@ def eval(
             path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
                                         str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold))
 
-
-            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, str(fold), \
-                                                    "fast_dev" + str(fast_dev), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
+            load_all = not fast_dev
+            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, \
+                                                    "load_all_" + str(load_all), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
 
             
             work_dir_amb = work_dir + "/" + str(fold)
@@ -598,10 +598,9 @@ def finetune_model(
     # Note: This assumes we are training/validating on the same set, if want to 
     # train/val/test on different data sources, use a different 'model_save_root'
     load_data = True
-    base_dl_path = os.path.join(path_to_saved_dataloaders, 'finetuning') 
-    full_dl_path = os.path.join(base_dl_path, 'dataloaders_fine.pt')
+    full_dl_path = os.path.join(path_to_saved_dataloaders, 'dataloaders_fine.pt')
     print(f"expecting dataloaders here: {full_dl_path}")
-    os.makedirs(base_dl_path, exist_ok=True) 
+    os.makedirs(path_to_saved_dataloaders, exist_ok=True) 
 
     if os.path.isfile(full_dl_path):
         try:
@@ -759,9 +758,8 @@ def pretrain_model(
 
 
     load_data = True
-    base_dl_path = os.path.join(path_to_saved_dataloaders, 'finetuning') 
-    full_dl_path = os.path.join(base_dl_path, 'dataloaders_pre.pt')
-    os.makedirs(base_dl_path, exist_ok=True)     
+    full_dl_path = os.path.join(path_to_saved_dataloaders, 'dataloaders_pre.pt')
+    os.makedirs(path_to_saved_dataloaders, exist_ok=True)     
     if os.path.isfile(full_dl_path):
         try:
             data_loaders = torch.load(full_dl_path)
