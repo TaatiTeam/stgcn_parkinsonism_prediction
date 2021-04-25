@@ -109,10 +109,6 @@ def train_simple(
     if 'use_gait_feats' in dataset_cfg[1]['data_source']:
         model_cfg['use_gait_features'] = dataset_cfg[1]['data_source']['use_gait_feats']
 
-    for ds in dataset_cfg:
-        ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
-        ds['data_source']['data_dir'] = os.path.join(local_data_base, ds['data_source']['data_dir'])
-
     # Set the paths for input and output
     work_dir = os.path.join(resource_root, work_dir, wandb_group)
     wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
@@ -120,57 +116,54 @@ def train_simple(
     dataloader_temp = os.path.join(resource_root, 'dataloaders')
     local_data_base = os.path.join(resource_root, 'data')
 
+    for ds in dataset_cfg:
+        ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
+        ds['data_source']['data_dir'] = os.path.join(local_data_base, ds['data_source']['data_dir'])
 
     os.makedirs(work_dir)
     os.environ["WANDB_RUN_GROUP"] = wandb_group
 
     # Load data from provided dataloaders
-    first_dataset, second_dataset, have_second_dataset = getAllInputFiles(dataset_cfg)
-
-
-
-
+    non_test_walks_all, test_walks, have_second_dataset = getAllInputFiles(dataset_cfg)
 
 
     try:
-        plt.close('all')
-        test_walks = all_files_test
-        non_test_walks_all = all_files
-
-
-
-        # data exploration
-        print(f"test_walks: {len(test_walks)}")
-        print(f"non_test_walks: {len(non_test_walks_all)}")
-
-
         # Split the non_test walks into train/val
         kf = KFold(n_splits=cv, shuffle=True, random_state=1)
         kf.get_n_splits(non_test_walks_all)
 
+        # Loop through the folds, doing pretraining and finetuning on the
+        # train/val splits and testing on test dataset
 
-
-        # This loop is for pretraining
-        num_reps = 1
+        fold = 0
         for train_ids, val_ids in kf.split(non_test_walks_all):
             plt.close('all')
-            test_id = num_reps
-            num_reps += 1
+            fold += 1
+
+            path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
+                                        str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold))
+
+            if not os.path.exists(path_to_pretrained_model):
+                os.makedirs(path_to_pretrained_model)
+
+
+            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, str(fold), \
+                                                    "fast_dev" + str(fast_dev), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
+
+                        
+            work_dir_amb = work_dir + "/" + str(fold)
 
             # Divide all of the data into train/val
             train_walks = [non_test_walks_all[i] for i in train_ids]
             val_walks = [non_test_walks_all[i] for i in val_ids]
 
+            # Use the configs from the YAML file for the test set
             datasets = [copy.deepcopy(dataset_cfg[0]) for i in range(len(workflow))]
             datasets[2] = copy.deepcopy(dataset_cfg[1])
             datasets[2]['pipeline'] = copy.deepcopy(dataset_cfg[0]['pipeline'])
-            # datasets[2]['data_source']['use_gait_feats'] = False # Don't use gait features for pretraining
+            datasets[2]['data_source']['use_gait_feats'] = copy.deepcopy(datasets[0]['data_source']['use_gait_feats'])
 
-            for ds in datasets:
-                ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
 
-            print(datasets)
-            # input('a')
             # ================================ STAGE 1 ====================================
             # Stage 1 training
             datasets[0]['data_source']['data_dir'] = train_walks
@@ -180,47 +173,27 @@ def train_simple(
             if fast_dev:
                 datasets[0]['data_source']['data_dir'] = train_walks[:num_walks_in_fast]
                 datasets[1]['data_source']['data_dir'] = val_walks[:num_walks_in_fast]
-                datasets[2]['data_source']['data_dir'] = test_walks[:100]
+                datasets[2]['data_source']['data_dir'] = test_walks[:num_walks_in_fast]
 
 
             workflow_stage_1 = copy.deepcopy(workflow)
             loss_cfg_stage_1 = copy.deepcopy(loss_cfg[0])
             optimizer_cfg_stage_1 = optimizer_cfg[0]
 
-            print('optimizer_cfg_stage_1 ', optimizer_cfg_stage_1)
 
-            work_dir_amb = work_dir + "/" + str(test_id)
-            simple_work_dir_amb = simple_work_dir + "/" + str(test_id)
-
-            things_to_log = {'num_ts_predicting': model_cfg['num_ts_predicting'], 'es_start_up_1': es_start_up_1, 'es_patience_1': es_patience_1, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': num_reps, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_1, 'optimizer_cfg': optimizer_cfg_stage_1, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
+            things_to_log = {'num_reps_pd': fold, 'num_ts_predicting': model_cfg['num_ts_predicting'], 'es_start_up_1': es_start_up_1, 'es_patience_1': es_patience_1, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': fold, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_1, 'optimizer_cfg': optimizer_cfg_stage_1, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
 
 
             print('stage_1_train: ', len(train_walks))
             print('stage_1_val: ', len(val_walks))
             print('stage_1_test: ', len(test_walks))
 
-            # path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, dataset_cfg[0]['data_source']['outcome_label'], model_type, \
-            #                                         str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(test_id))
 
-            # Pretrain doesnt depend on the outcome label
-            path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
-                                                    str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(test_id))
-
-
-            load_all = flip_loss != 0
-            load_all = False  # Hold over, this is just for location of dataloaders
-            path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, str(num_reps), \
-                                                    "load_all" + str(load_all), "gait_feats_" + str(model_cfg['use_gait_features']), str(test_id))
-            
-
-            print('path_to_pretrained_model', path_to_pretrained_model)
-            if not os.path.exists(path_to_pretrained_model):
-                os.makedirs(path_to_pretrained_model)
 
 
             pretrained_model = pretrain_model(
                 work_dir_amb,
-                simple_work_dir_amb,
+                work_dir_amb,
                 model_cfg,
                 loss_cfg_stage_1,
                 datasets,
@@ -245,34 +218,12 @@ def train_simple(
                 )
 
 
-        
-
-
 
             # ================================ STAGE 2 ====================================
             # Make sure we're using the correct dataset
             for ds in datasets:
                 ds['pipeline'] = dataset_cfg[1]['pipeline']
                 ds['data_source']['use_gait_feats'] = dataset_cfg[1]['data_source']['use_gait_feats']
-
-
-            # datasets = [copy.deepcopy(dataset_cfg[0]) for i in range(len(workflow))]
-            # datasets[2] = dataset_cfg[1]
-
-            # for ds in datasets:
-            #     ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
-
-
-            # # Stage 2 training
-            # datasets[0]['data_source']['data_dir'] = train_walks
-            # datasets[1]['data_source']['data_dir'] = val_walks
-            # datasets[2]['data_source']['data_dir'] = test_walks
-
-
-            # if fast_dev:
-            #     datasets[0]['data_source']['data_dir'] = train_walks[:50]
-            #     datasets[1]['data_source']['data_dir'] = val_walks[:50]
-            #     datasets[2]['data_source']['data_dir'] = test_walks[:50]
 
 
             # Don't shear or scale the test or val data (also always just take the middle 120 crop)
@@ -285,7 +236,7 @@ def train_simple(
             print('optimizer_cfg_stage_2 ', optimizer_cfg_stage_2)
 
                 
-            # if we don't want to use the pretrained head, reset to norm init
+            # if we don't want to use the pretrained head, reset the backbone using xavier init
             if not pretrain_model:
                 pretrained_model.module.encoder.apply(weights_init_xavier)
 
@@ -293,14 +244,7 @@ def train_simple(
             pretrained_model.module.set_stage_2()
             pretrained_model.module.head.apply(weights_init_xavier)
 
-            things_to_log = {'do_position_pretrain': do_position_pretrain, 'num_reps_pd': test_id, 'train_extrema_for_epochs': train_extrema_for_epochs, 'supcon_head': head, 'freeze_encoder': freeze_encoder, 'es_start_up_2': es_start_up_2, 'es_patience_2': es_patience_2, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': test_id, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_2, 'optimizer_cfg': optimizer_cfg_stage_2, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
-
-            # print("final model for fine_tuning is: ", pretrained_model)
-            # input("here: " + work_dir_amb)
-            # print("starting finetuning", "*" *100)
-            for ds in datasets:
-                print(ds['pipeline'])
-            # input('before stage 2')
+            things_to_log = {'num_reps_pd': fold, 'do_position_pretrain': do_position_pretrain, 'fold': fold, 'train_extrema_for_epochs': train_extrema_for_epochs, 'supcon_head': head, 'freeze_encoder': freeze_encoder, 'es_start_up_2': es_start_up_2, 'es_patience_2': es_patience_2, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': fold, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_2, 'optimizer_cfg': optimizer_cfg_stage_2, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
             _, num_epochs = finetune_model(work_dir_amb,
                         pretrained_model,
                         loss_cfg_stage_2,
@@ -326,34 +270,21 @@ def train_simple(
                         path_to_saved_dataloaders, 
                         path_to_pretrained_model)
 
+    except Exception as e:
+        logging.exception(e)
+        print(e)
 
 
-        # Done CV
-        try:
-            # robust_rmtree(work_dir_amb)
-            print('failed to delete the participant folder')
-
-        except:
-            print('failed to delete the participant folder')
-
-    except TooManyRetriesException:
-        print("CAUGHT TooManyRetriesException - something is very wrong. Stopping")
-        # sync_wandb(wandb_log_local_group)
-
+    # Calculate summary metrics
+    computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
+    
+    # Delete the work_dir
+    try:
+        shutil.rmtree(work_dir)
     except:
-        logging.exception("this went wrong")
-        # Done with this participant, we can delete the temp foldeer
-        try:
-            # robust_rmtree(work_dir_amb)
-            print('failed to delete the participant folder')
+        logging.exception('This: ')
+        print('failed to delete the work_dir folder: ', work_dir)
 
-        except:
-            print('failed to delete the participant folder')
-
-
-
-
-    final_stats_objective2(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
 
 def eval(
         work_dir,
@@ -429,10 +360,6 @@ def eval(
     if 'use_gait_feats' in dataset_cfg[0]['data_source']:
         model_cfg['use_gait_features'] = dataset_cfg[0]['data_source']['use_gait_feats']
 
-    for ds in dataset_cfg:
-        ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
-        ds['data_source']['data_dir'] = os.path.join(local_data_base, ds['data_source']['data_dir'])
-
     # Set the paths for input and output
     work_dir = os.path.join(resource_root, work_dir, wandb_group)
     wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
@@ -440,8 +367,11 @@ def eval(
     dataloader_temp = os.path.join(resource_root, 'dataloaders')
     local_data_base = os.path.join(resource_root, 'data')
 
-    
-    
+    for ds in dataset_cfg:
+        ds['data_source']['layout'] = model_cfg['graph_cfg']['layout']
+        ds['data_source']['data_dir'] = os.path.join(local_data_base, ds['data_source']['data_dir'])
+
+
     os.makedirs(work_dir)
     os.environ["WANDB_RUN_GROUP"] = wandb_group
 
@@ -450,21 +380,18 @@ def eval(
 
 
     try:
-        plt.close('all')
 
         for fold in range(1, cv + 1):
+            plt.close('all')
             path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
                                         str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold))
 
 
-            load_all = flip_loss != 0
-            load_all = False  # Hold over, this is just for location of dataloaders TODO: remove this and reformat save locations
             path_to_saved_dataloaders = os.path.join(dataloader_temp, outcome_label, model_save_root, str(fold), \
-                                                    "load_all" + str(load_all), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
+                                                    "fast_dev" + str(fast_dev), "gait_feats_" + str(model_cfg['use_gait_features']), str(fold))
 
             
             work_dir_amb = work_dir + "/" + str(fold)
-
 
 
             loss_cfg_stage_2 = copy.deepcopy(loss_cfg[0])
@@ -650,27 +577,33 @@ def finetune_model(
         train_extrema_for_epochs=0,
         path_to_saved_dataloaders=None, 
         path_to_pretrained_model=None, 
-        eval_only=False,
+        skip_if_checkpoint_exists=False,
 ):
     print("=============================================================Starting STAGE 2: Fine-tuning...")
+    checkpoint_file = os.path.join(path_to_pretrained_model, 'checkpoint_final.pt')
 
     # Load the model from the saved checkpoint if it exists
-    if path_to_pretrained_model is not None:
-        checkpoint_file = os.path.join(path_to_pretrained_model, 'checkpoint_pretrain.pt')
-        if os.path.isfile(checkpoint_file):
+    if skip_if_checkpoint_exists and os.path.isfile(checkpoint_file):
+        try:
+            print(checkpoint_file)
+            input('trying to load checkpoint')
             model.load_state_dict(torch.load(checkpoint_file))
+            return model, 0
             print('have pretrained model!')
-        elif eval_only:
-            raise ValueError('The path to pretrained models does not exists')
-    
+        except:
+            # need to actually do the training because failed to load in the checkpoint file
+            print('failed to load the checkpoint file')
 
+    # Check if we need to load in the data or if it is available already
+    # Note: This assumes we are training/validating on the same set, if want to 
+    # train/val/test on different data sources, use a different 'model_save_root'
     load_data = True
     base_dl_path = os.path.join(path_to_saved_dataloaders, 'finetuning') 
     full_dl_path = os.path.join(base_dl_path, 'dataloaders_fine.pt')
     print(f"expecting dataloaders here: {full_dl_path}")
     os.makedirs(base_dl_path, exist_ok=True) 
 
-    if os.path.isfile(full_dl_path) and not eval_only:
+    if os.path.isfile(full_dl_path):
         try:
             data_loaders = torch.load(full_dl_path)
             load_data = False
@@ -686,7 +619,6 @@ def finetune_model(
                                         num_workers=workers,
                                         drop_last=False)
     
-        input(train_dataloader)
 
         # Normalize the val and test sets by the train set scaler
         for d in datasets[1:]:

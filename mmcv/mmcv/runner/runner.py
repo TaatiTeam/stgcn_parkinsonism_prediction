@@ -1059,10 +1059,8 @@ class Runner(object):
             # mode = "train", "val", "test"
             true_labels, predicted_labels, raw_preds, names, num_ts, demo_data, all_data  = self.basic_no_log_eval(data_loaders[i], **kwargs)
             acc = accuracy_score(true_labels, predicted_labels)
-            # print(demo_data)
             final_results_base, amb = os.path.split(self.work_dir)
             try:
-                print(self.things_to_log)
                 final_results_path = os.path.join(final_results_base, 'all_final_eval', str(self.things_to_log['num_reps_pd']))
             except:
                 final_results_path = os.path.join(final_results_base, 'all_final_eval', self.things_to_log['wandb_group'])
