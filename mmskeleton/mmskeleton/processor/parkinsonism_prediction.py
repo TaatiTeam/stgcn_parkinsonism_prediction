@@ -159,21 +159,23 @@ def train_simple(
 
             # Use the configs from the YAML file for the test set
             datasets = [copy.deepcopy(dataset_cfg[0]) for i in range(len(workflow))]
-            datasets[2] = copy.deepcopy(dataset_cfg[1])
-            datasets[2]['pipeline'] = copy.deepcopy(dataset_cfg[0]['pipeline'])
-            datasets[2]['data_source']['use_gait_feats'] = copy.deepcopy(datasets[0]['data_source']['use_gait_feats'])
-
 
             # ================================ STAGE 1 ====================================
             # Stage 1 training
             datasets[0]['data_source']['data_dir'] = train_walks
             datasets[1]['data_source']['data_dir'] = val_walks
-            datasets[2]['data_source']['data_dir'] = test_walks
+
+            if len(datasets) > 2:
+                datasets[2] = copy.deepcopy(dataset_cfg[1])
+                datasets[2]['pipeline'] = copy.deepcopy(dataset_cfg[0]['pipeline'])
+                datasets[2]['data_source']['use_gait_feats'] = copy.deepcopy(datasets[0]['data_source']['use_gait_feats'])
+                datasets[2]['data_source']['data_dir'] = test_walks
 
             if fast_dev:
                 datasets[0]['data_source']['data_dir'] = train_walks[:num_walks_in_fast]
                 datasets[1]['data_source']['data_dir'] = val_walks[:num_walks_in_fast]
-                datasets[2]['data_source']['data_dir'] = test_walks[:num_walks_in_fast]
+                if len(datasets) > 2:
+                    datasets[2]['data_source']['data_dir'] = test_walks[:num_walks_in_fast]
 
 
             workflow_stage_1 = copy.deepcopy(workflow)
@@ -228,7 +230,8 @@ def train_simple(
 
             # Don't shear or scale the test or val data (also always just take the middle 120 crop)
             datasets[1]['pipeline'] = eval_pipeline
-            datasets[2]['pipeline'] = eval_pipeline
+            if len(datasets) > 2:
+                datasets[2]['pipeline'] = eval_pipeline
 
             optimizer_cfg_stage_2 = optimizer_cfg[1]
             loss_cfg_stage_2 = copy.deepcopy(loss_cfg[1])

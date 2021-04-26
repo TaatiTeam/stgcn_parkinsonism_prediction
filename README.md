@@ -55,7 +55,7 @@ Note that it is possible to develop and use a different input data format for yo
 
 
 # Evaluating on Pretrained Models
-This library relies on YAML files for specifying configurations. A sample YAML file for evaluating pretraining models on a new dataset is: `mmskeleton/configs/parkinsonism_prediction/detectron/eval/train_cluster_2_120_pred_15_4_joints_do_0.2.yaml`. 
+This library relies on YAML files for specifying configurations. YAML configuration files for the best models as proposed in our manuscript are included for each of the five feature sets investigated (OpenPose, Detectron2, ,AlphaPose, Kinect2D, Kinect3D). A sample YAML file for evaluating pretraining models on a new dataset is: `mmskeleton/configs/parkinsonism_prediction/detectron/eval/train_cluster_2_120_pred_15_4_joints_do_0.2.yaml`. 
 
 Modify this file as appropriate to specify the filepath of the dataset to evaluate on. Other parameters may be modified in the YAML file as necessary, but the model settings should not be altered as they correspond to the configurations of the provided pretrained models. 
 
