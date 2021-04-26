@@ -22,7 +22,7 @@ processor_cfg:
   weight_classes: True
   flip_loss: 1
   launch_from_local: True
-  wandb_project: "RELEASE_DEV"
+  wandb_project: "ST_GCN_EVAL"
   early_stopping: True
   force_run_all_epochs: False
   es_patience_1: 25
@@ -34,7 +34,6 @@ processor_cfg:
   train_extrema_for_epochs: 25
   do_position_pretrain: True
   model_save_root: "detectron_models"  # This is where we look for and save pretrained models
-  # resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"
   resource_root: "/home/saboa/code/stgcn_parkinsonsim_prediction/sample_data"
 
   # model setting

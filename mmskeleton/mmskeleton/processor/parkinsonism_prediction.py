@@ -378,7 +378,6 @@ def eval(
     # Load data from provided dataloaders
     test_walks, _, _ = getAllInputFiles(dataset_cfg)
 
-
     try:
 
         for fold in range(1, cv + 1):
@@ -400,10 +399,10 @@ def eval(
             datasets = [copy.deepcopy(dataset_cfg[0]) for i in range(len(workflow))]
 
             
-            datasets[0]['data_source']['data_dir'] = all_files_test
+            datasets[0]['data_source']['data_dir'] = test_walks
 
             if fast_dev:
-                datasets[0]['data_source']['data_dir'] = all_files_test[:num_walks_in_fast]
+                datasets[0]['data_source']['data_dir'] = test_walks[:num_walks_in_fast]
 
             things_to_log = {'do_position_pretrain': do_position_pretrain, 'train_extrema_for_epochs': train_extrema_for_epochs, \
                 'supcon_head': head, 'freeze_encoder': freeze_encoder, 'es_start_up_2': es_start_up_2, 'es_patience_2': es_patience_2, \
@@ -499,7 +498,6 @@ def evaluate_model(
     
 
     set_seed(0)
-
     data_loaders = [torch.utils.data.DataLoader(dataset=call_obj(**datasets[0]),
                                     batch_size=batch_size,
                                     shuffle=True,
