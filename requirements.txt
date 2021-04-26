@@ -21,10 +21,6 @@ lazy-import==0.2.2
 lazy-object-proxy==1.4.3
 matplotlib==3.2.1
 mccabe==0.6.1
-
-# ./some_fir/some_package.whl
-# -e git+https://github.com/andreasabo-ibbme/mmcv.git@287f815f5f43e0485c84978df36bb3f0dedc2c6c#egg=mmcv
-# -e git+https://github.com/andreasabo-ibbme/mmskeleton.git@010ac87ec4c61bfb3c2a390f99deb7c339901c9b#egg=mmskeleton
 numpy==1.18.1
 nvidia-ml-py3==7.352.0
 opencv-python==3.4.4.19
