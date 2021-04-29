@@ -33,9 +33,9 @@ processor_cfg:
   head: "stgcn"
   train_extrema_for_epochs: 25
   do_position_pretrain: True
-  model_save_root: "detectron_models_to_share"  # This is where we look for and save pretrained models
-  resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"  # Resource root of data and models
-  # resource_root: "/home/saboa/code/stgcn_parkinsonsim_prediction/sample_data"
+  model_save_root: "detectron_models"  # This is where we look for and save pretrained models
+  # resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"  # Resource root of data and models
+  resource_root: "/home/saboa/code/stgcn_parkinsonsim_prediction/sample_data"
 
   # model setting
   model_cfg:
