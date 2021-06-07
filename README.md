@@ -1,5 +1,5 @@
 # Preamble
-This repository includes a minimal demo and pretrained spatial-temporal graph convolutional networks (ST-GCN) models proposed in [TODO - link to paper]. The goal of this work is to predict clinical scores of parkinsonism in gait from 2D or 3D skeleton joint trajectories obtained from video. 
+This repository includes a minimal demo and pretrained spatial-temporal graph convolutional networks (ST-GCN) models proposed in "Estimating Parkinsonism Severity in Natural Gait Videos of Older Adults with Dementia" by Andrea Sabo, Sina Mehdizadeh, Andrea Iaboni, and Babak Taati (https://arxiv.org/pdf/2105.03464.pdf). The goal of this work is to predict clinical scores of parkinsonism in gait from 2D or 3D skeleton joint trajectories obtained from video. 
 
 This work extends upon work by Yan et al. (https://arxiv.org/abs/1801.07455) on the use of ST-GCNs for action recognition. Modified forks of the `mmcv` and `mmskeleton` repositories developed by `OpenMMLab` (https://openmmlab.com/) are included in this repository. The original GitHub pages for these repositories for these projects are: \
 &emsp;    - https://github.com/open-mmlab/mmcv \
