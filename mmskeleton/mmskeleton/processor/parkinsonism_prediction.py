@@ -449,7 +449,7 @@ def eval(
         print(e)
 
     # Calculate summary metrics
-    computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
+    # computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv)
     
     # Delete the work_dir
     try:
@@ -487,29 +487,55 @@ def evaluate_model(
         path_to_pretrained_model=None, 
 ):
     print("======================================EVALUATING MODEL")
+    model.set_stage_2()
 
     # Load the model from the saved checkpoint if it exists
     if path_to_pretrained_model is not None:
-        checkpoint_file = os.path.join(path_to_pretrained_model, 'checkpoint_pretrain.pt')
+        checkpoint_file = os.path.join(path_to_pretrained_model, 'checkpoint_final.pt')
         if os.path.isfile(checkpoint_file):
             model.load_state_dict(torch.load(checkpoint_file))
             model = MMDataParallel(model, device_ids=range(gpus)).cuda()
-
             print('have pretrained model!')
         else:
             raise ValueError('The path to pretrained models does not exists')
     
+    load_data = True
+    full_dl_path = os.path.join(path_to_saved_dataloaders, 'dataloaders_fine_test.pt')
+    full_dl_path_train = os.path.join(path_to_saved_dataloaders, 'dataloaders_fine.pt') # From training
+    print(f"expecting dataloaders here: {full_dl_path}")
+    os.makedirs(path_to_saved_dataloaders, exist_ok=True) 
 
-    set_seed(0)
-    data_loaders = [torch.utils.data.DataLoader(dataset=call_obj(**datasets[0]),
-                                    batch_size=batch_size,
-                                    shuffle=True,
-                                    num_workers=workers,
-                                    drop_last=False)]
+    if os.path.isfile(full_dl_path):
+            try:
+                data_loaders = torch.load(full_dl_path)
+                load_data = False
+            except:
+                print(f'failed to load dataloaders from file: {full_dl_path}, loading from individual files')
+
+    if load_data:
+        set_seed(0)
+        # Normalize the test set by the train set scaler
+        train_dataloader = torch.load(full_dl_path_train)
+        train_dataloader  = train_dataloader[0] # Extract just the train set
+        for d in datasets:
+            # input(d)
+            d['data_source']['fit_scaler'] = train_dataloader.dataset.get_fit_scaler()
+            d['data_source']['scaler'] = train_dataloader.dataset.get_scaler()
+
+        data_loaders = [torch.utils.data.DataLoader(dataset=call_obj(**datasets[0]),
+                                        batch_size=batch_size,
+                                        shuffle=True,
+                                        num_workers=workers,
+                                        drop_last=False)]
 
 
-    data_loaders[0].dataset.data_source.sample_extremes = True
-        
+
+
+
+        # data_loaders[0].dataset.data_source.sample_extremes = True
+
+        # Save for next time
+        torch.save(data_loaders, full_dl_path)
 
     workflow = [tuple(w) for w in workflow]
     global balance_classes
@@ -586,8 +612,8 @@ def finetune_model(
     # Load the model from the saved checkpoint if it exists
     if skip_if_checkpoint_exists and os.path.isfile(checkpoint_file):
         try:
-            print(checkpoint_file)
-            input('trying to load checkpoint')
+            # print(checkpoint_file)
+            # input('trying to load checkpoint')
             model.load_state_dict(torch.load(checkpoint_file))
             return model, 0
             print('have pretrained model!')
