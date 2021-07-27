@@ -80,3 +80,15 @@ To run the training workflow provide the appropriate YAML file to `mmskl.py`:
     python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/train/train_cluster_2_120_pred_15_4_joints_do_0.2.yaml
 ```
 
+# Citation
+Please cite our paper if this library helps your research:
+```
+@article{sabo2021estimating,
+  title={Estimating Parkinsonism Severity in Natural Gait Videos of Older Adults with Dementia},
+  author={Sabo, Andrea and Mehdizadeh, Sina and Iaboni, Andrea and Taati, Babak},
+  journal={arXiv preprint arXiv:2105.03464},
+  year={2021}
+}
+```
+
+
