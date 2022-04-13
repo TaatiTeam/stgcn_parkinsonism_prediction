@@ -49,6 +49,8 @@ This code was tested on Linux 20.04 with Python 3.7.8, Pytorch 1.5, and Cuda 10.
 This library does not provide pose-tracking or data preparation functionality, but can be used to predict parkinsonism scores from 2D or 3D skeleton trajectories. Possible libraries for extracting joint trajectories are OpenPose, Detectron2, AlphaPose, or the Microsoft Kinect. However, as these libraries predict joint positions independently for each frame of the input video, post-processing is necessary to temporally join and smooth the trajectories of the person of interest. Additionally, to use the pretrained models provided in this library, the joint trajectories must be centered at [100, 100, (100 - *z only*)]. This is not strictly necessary if training models from scratch. 
 A more detailed description of these data preparation steps is available in our manuscript. 
 
+Please see our supplementary repository for MATLAB scripts for calculating gait features (optional for use in our ST-GCN models): https://github.com/TaatiTeam/gait_features_from_pose
+
 ## Sample data
 Some sample input files can be found in `sample_data/data/tri_detectron/stgcn_normalized_100_center_pd_no_norm`. These files should be used as reference for naming conventions. 
 
@@ -85,11 +87,12 @@ To run the training workflow provide the appropriate YAML file to `mmskl.py`:
 # Citation
 Please cite our paper if this library helps your research:
 ```
-@article{sabo2021estimating,
-  title={Estimating Parkinsonism Severity in Natural Gait Videos of Older Adults with Dementia},
+@article{sabo2022estimating,
+  title={Estimating parkinsonism severity in natural gait videos of older adults with dementia},
   author={Sabo, Andrea and Mehdizadeh, Sina and Iaboni, Andrea and Taati, Babak},
-  journal={arXiv preprint arXiv:2105.03464},
-  year={2021}
+  journal={IEEE Journal of Biomedical and Health Informatics},
+  year={2022},
+  publisher={IEEE}
 }
 ```
 
