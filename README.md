@@ -22,13 +22,14 @@ This code was tested on Linux 20.04 with Python 3.7.8, Pytorch 1.5, and Cuda 10.
 
  - Install dependencies:
     ```
-    pip install Cython numpy ninja
-    pip install -r requirements.txt
+    python -m pip install pip=23.0s
+    python -m pip install Cython numpy ninja
+    python -m pip install -r requirements.txt
     ```
 
  - Install MMCV
     ```
-    pip install -e mmcv/
+    python -m pip install -e mmcv/
     ```
 
  - Install MMSkeleton
