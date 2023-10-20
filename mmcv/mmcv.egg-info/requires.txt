@@ -1,4 +1,4 @@
 addict
 numpy
 pyyaml
-opencv-python-headless>=3
+opencv-python>=3
