@@ -245,7 +245,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                 file_index = index - len(self.files)
 
             data_struct_interpolated = pd.read_csv(self.files[file_index])
-            data_struct_interpolated.fillna(data_struct_interpolated.mean(), inplace=True)
+            data_struct_interpolated.fillna(data_struct_interpolated.mean(numeric_only=True), inplace=True)
 
 
             data_struct = {} 

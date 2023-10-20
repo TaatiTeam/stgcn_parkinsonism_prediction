@@ -18,7 +18,10 @@ import numpy as np
 from .estimation import EstiamtionDataset
 from ..ops.nms.nms import oks_nms
 from ..ops.nms.nms import soft_oks_nms
-from pycocotools import COCO, COCOeval
+# from pycocotools import COCO, COCOeval
+
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 
 logger = logging.getLogger(__name__)
 
