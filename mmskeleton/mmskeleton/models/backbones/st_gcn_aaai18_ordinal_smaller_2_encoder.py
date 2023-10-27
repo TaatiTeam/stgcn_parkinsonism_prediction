@@ -26,50 +26,47 @@ class ST_GCN_18_ordinal_smaller_2_encoder(nn.Module):
             :math:`M_{in}` is the number of instance in a frame.
     """
 
-    def __init__(self,
-                 in_channels,
-                 num_class,
-                 graph_cfg,
-                 temporal_kernel_size,
-                 head="stgcn",
-                 edge_importance_weighting=True,
-                 data_bn=True,
-                 **kwargs):
-                 
+    def __init__(
+        self,
+        in_channels,
+        num_class,
+        graph_cfg,
+        temporal_kernel_size,
+        head="stgcn",
+        edge_importance_weighting=True,
+        data_bn=True,
+        **kwargs
+    ):
         super().__init__()
         # load graph
         self.graph = Graph(**graph_cfg)
-        A = torch.tensor(
-            self.graph.A, dtype=torch.float32, requires_grad=False)
-        self.register_buffer('A', A)
+        A = torch.tensor(self.graph.A, dtype=torch.float32, requires_grad=False)
+        self.register_buffer("A", A)
         self.head = head
         # build networks
         spatial_kernel_size = A.size(0)
         kernel_size = (temporal_kernel_size, spatial_kernel_size)
-        self.data_bn = nn.BatchNorm1d(
-            in_channels * A.size(1)) if data_bn else lambda x: x
-        kwargs0 = {k: v for k, v in kwargs.items() if k != 'dropout'}
-        self.st_gcn_networks = nn.ModuleList((
-                st_gcn_block(
-                    in_channels, 32, kernel_size, 1, residual=False, **kwargs0),
+        self.data_bn = nn.BatchNorm1d(in_channels * A.size(1)) if data_bn else lambda x: x
+        kwargs0 = {k: v for k, v in kwargs.items() if k != "dropout"}
+        self.st_gcn_networks = nn.ModuleList(
+            (
+                st_gcn_block(in_channels, 32, kernel_size, 1, residual=False, **kwargs0),
                 st_gcn_block(32, 32, kernel_size, 1, **kwargs),
                 st_gcn_block(32, 64, kernel_size, 2, **kwargs),
                 st_gcn_block(64, 64, kernel_size, 1, **kwargs),
-            ))
+            )
+        )
         self.output_filters = 64
 
         # initialize parameters for edge importance weighting
         if edge_importance_weighting:
-            self.edge_importance = nn.ParameterList([
-                nn.Parameter(torch.ones(self.A.size()))
-                for i in self.st_gcn_networks
-            ])
+            self.edge_importance = nn.ParameterList(
+                [nn.Parameter(torch.ones(self.A.size())) for i in self.st_gcn_networks]
+            )
         else:
             self.edge_importance = [1] * len(self.st_gcn_networks)
 
-
     def forward(self, x):
-
         # data normalization
         N, C, T, V, M = x.size()
         x = x.permute(0, 4, 3, 1, 2).contiguous()
@@ -86,13 +83,12 @@ class ST_GCN_18_ordinal_smaller_2_encoder(nn.Module):
         # global pooling
         x = F.avg_pool2d(x, x.size()[2:])
         x = x.view(N, M, -1, 1, 1).mean(dim=1)
-        if not self.head == 'stgcn':
+        if not self.head == "stgcn":
             x = x.view(x.size(0), -1)
 
         return x
 
     def extract_feature(self, x):
-
         # data normalization
         N, C, T, V, M = x.size()
         x = x.permute(0, 4, 3, 1, 2).contiguous()
@@ -141,21 +137,14 @@ class st_gcn_block(nn.Module):
 
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride=1,
-                 dropout=0,
-                 residual=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, dropout=0, residual=True):
         super().__init__()
 
         assert len(kernel_size) == 2
         assert kernel_size[0] % 2 == 1
         padding = ((kernel_size[0] - 1) // 2, 0)
 
-        self.gcn = ConvTemporalGraphical(in_channels, out_channels,
-                                         kernel_size[1])
+        self.gcn = ConvTemporalGraphical(in_channels, out_channels, kernel_size[1])
 
         self.tcn = nn.Sequential(
             nn.BatchNorm2d(out_channels),
@@ -179,18 +168,13 @@ class st_gcn_block(nn.Module):
 
         else:
             self.residual = nn.Sequential(
-                nn.Conv2d(
-                    in_channels,
-                    out_channels,
-                    kernel_size=1,
-                    stride=(stride, 1)),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=(stride, 1)),
                 nn.BatchNorm2d(out_channels),
             )
 
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, A):
-
         res = self.residual(x)
         x, A = self.gcn(x, A)
         x = self.tcn(x) + res

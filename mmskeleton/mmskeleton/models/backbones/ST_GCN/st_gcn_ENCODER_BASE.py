@@ -33,22 +33,12 @@ class ST_GCN_encoder(nn.Module):
             :math:`M_{in}` is the number of instance in a frame.
     """
 
-    def __init__(
-        self,
-        in_channels,
-        num_class,
-        graph_cfg,
-        head="stgcn",
-        data_bn=True,
-        **kwargs
-    ):
-        
+    def __init__(self, in_channels, num_class, graph_cfg, head="stgcn", data_bn=True, **kwargs):
         print("In ST_GCN_encoder_BASE: ", graph_cfg)
         # Save member variables
         self.__set_default_params(kwargs)
         self.in_channels = in_channels
         self.num_class = num_class
-
 
         ic(kwargs)
         super().__init__()
@@ -70,9 +60,63 @@ class ST_GCN_encoder(nn.Module):
         # print(kwargs)
         # print(kwargs0)
 
+    def forward(self, x):
+        # data normalization
+        N, C, T, V, M = x.size()
+        x = x.permute(0, 4, 3, 1, 2).contiguous()
+        x = x.view(N * M, V * C, T)
+        x = self.data_bn(x)
+        x = x.view(N, M, V, C, T)
+        x = x.permute(0, 1, 3, 4, 2).contiguous()
+        x = x.view(N * M, C, T, V)
+
+        # forward
+        for gcn, importance in zip(self.st_gcn_networks, self.edge_importance):
+            x, _ = gcn(x, self.A * importance)
+
+        # global pooling
+        x = F.avg_pool2d(x, x.size()[2:])
+        x = x.view(N, M, -1, 1, 1).mean(dim=1)
+        if not self.head == "stgcn":
+            x = x.view(x.size(0), -1)
+
+        return x
+
+    def extract_feature(self, x):
+        # data normalization
+        N, C, T, V, M = x.size()
+        x = x.permute(0, 4, 3, 1, 2).contiguous()
+        x = x.view(N * M, V * C, T)
+        x = self.data_bn(x)
+        x = x.view(N, M, V, C, T)
+        x = x.permute(0, 1, 3, 4, 2).contiguous()
+        x = x.view(N * M, C, T, V)
+
+        # forwad
+        for gcn, importance in zip(self.st_gcn_networks, self.edge_importance):
+            x, _ = gcn(x, self.A * importance)
+
+        _, c, t, v = x.size()
+        feature = x.view(N, M, c, t, v).permute(0, 2, 3, 4, 1)
+
+        # prediction
+        x = self.fcn(x)
+        output = x.view(N, M, -1, t, v).permute(0, 2, 3, 4, 1)
+
+        return output, feature
+
     def __set_default_params(self, kwargs):
         for k, v in kwargs.items():
             self.__dict__[k] = v
+
+    # initialize parameters for edge importance weighting
+    def set_edge_importance(self):
+        if self.edge_importance_weighting:
+            self.edge_importance = nn.ParameterList(
+                [nn.Parameter(torch.ones(self.A.size())) for i in self.st_gcn_networks]
+            )
+        else:
+            self.edge_importance = [1] * len(self.st_gcn_networks)
 
         # # Update if we have value
         # for k, v in default_dict.items():
@@ -107,22 +151,14 @@ class st_gcn_block(nn.Module):
 
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 stride=1,
-                 dropout=0,
-                 residual=True, 
-                 **kwargs):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, dropout=0, residual=True, **kwargs):
         super().__init__()
 
         assert len(kernel_size) == 2
         assert kernel_size[0] % 2 == 1
         padding = ((kernel_size[0] - 1) // 2, 0)
 
-        self.gcn = ConvTemporalGraphical(in_channels, out_channels,
-                                         kernel_size[1])
+        self.gcn = ConvTemporalGraphical(in_channels, out_channels, kernel_size[1])
 
         self.tcn = nn.Sequential(
             nn.BatchNorm2d(out_channels),
@@ -146,18 +182,13 @@ class st_gcn_block(nn.Module):
 
         else:
             self.residual = nn.Sequential(
-                nn.Conv2d(
-                    in_channels,
-                    out_channels,
-                    kernel_size=1,
-                    stride=(stride, 1)),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=(stride, 1)),
                 nn.BatchNorm2d(out_channels),
             )
 
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x, A):
-
         res = self.residual(x)
         x, A = self.gcn(x, A)
         x = self.tcn(x) + res

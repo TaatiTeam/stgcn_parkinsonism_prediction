@@ -1,4 +1,3 @@
-from abc import ABC
 import torch
 import torch.nn as nn
 
@@ -23,11 +22,7 @@ class ST_GCN_model(nn.Module):
             :math:`M_{in}` is the number of instance in a frame.
     """
 
-    def __init__(self,
-                 in_channels,
-                 num_class,
-                 graph_cfg,
-                 **kwargs):
+    def __init__(self, in_channels, num_class, graph_cfg, **kwargs):
         self.__set_default_params(**kwargs)
 
         self.in_channels = in_channels
@@ -47,7 +42,7 @@ class ST_GCN_model(nn.Module):
             "data_bn": True,
             "num_ts_predicting": 2,
             "num_joints_predicting": 13,
-            "head": 'stgcn',
+            "head": "stgcn",
             "temporal_kernel_size": 9,
             "gait_feat_num": 0,
             "use_gait_features": False,
@@ -59,8 +54,6 @@ class ST_GCN_model(nn.Module):
                 self.__dict__[k] = kwargs[k]
             else:
                 self.__dict__[k] = v
-
-
 
     def set_classification_head_size(self, num_gait_feats):
         if not self.use_gait_features:
