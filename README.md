@@ -8,7 +8,7 @@ Modified forks of the `mmcv` and `mmskeleton` repositories developed by `OpenMML
 &emsp;    - https://github.com/open-mmlab/mmskeleton 
 
 
-This code was tested on Linux 20.04 with Python 3.7.8, Pytorch 1.5, and Cuda 10.1.
+This code was tested on Linux 20.04 with Python 3.8.12, Pytorch 2.1.0, and Cuda 11.8.
 
 # Installation
 
@@ -16,20 +16,27 @@ This code was tested on Linux 20.04 with Python 3.7.8, Pytorch 1.5, and Cuda 10.
 
  - Create and activate virtualenv:
     ```
-    pyenv virtualenv 3.7.8 stgcn_parkinsonism
+    pyenv virtualenv 3.8.12 stgcn_parkinsonism
     pyenv activate stgcn_parkinsonism
     ```
 
  - Install dependencies:
     ```
-    pip install Cython numpy ninja
-    pip install -r requirements.txt
+    python -m pip install pip==23.0
+    python -m pip install Cython numpy ninja
+    python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    python -m pip install -r requirements.txt
     ```
 
  - Install MMCV
     ```
-    pip install -e mmcv/
+    python -m pip install -e mmcv/
     ```
+
+ - Install MMDetection
+   ```
+   python -m pip install -e mmdetection-1.0rc1/
+   ```
 
  - Install MMSkeleton
 
@@ -37,7 +44,7 @@ This code was tested on Linux 20.04 with Python 3.7.8, Pytorch 1.5, and Cuda 10.
     cd mmskeleton/mmskeleton/ops/nms/ 
     python setup_linux.py develop
     cd ../../../
-    python setup.py develop --mmdet
+    python setup.py develop
    ```
 
 - Login to WANDB
