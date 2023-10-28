@@ -121,6 +121,7 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     data_all = data.cuda()
     gait_features_all = gait_features.cuda()
     label = label.cuda()
+    non_pseudo_label = non_pseudo_label.cuda()
 
     # Remove the -1 labels (missing clinical score labels)
     y_true_all = label.data.reshape(-1, 1).float()
