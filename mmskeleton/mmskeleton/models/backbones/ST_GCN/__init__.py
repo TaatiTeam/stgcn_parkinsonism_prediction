@@ -1,0 +1,4 @@
+from .st_gcn_aaai18_ordinal_orig_position_pretrain import ST_GCN_18_ordinal_orig_position_pretrain
+from .st_gcn_aaai18_ordinal_smaller_2_position_pretrain import ST_GCN_18_ordinal_smaller_2_position_pretrain
+from .st_gcn_BASE import ST_GCN_model
+from .st_gcn_ENCODER_BASE import ST_GCN_encoder

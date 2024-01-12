@@ -245,7 +245,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                 file_index = index - len(self.files)
 
             data_struct_interpolated = pd.read_csv(self.files[file_index])
-            data_struct_interpolated.fillna(data_struct_interpolated.mean(), inplace=True)
+            data_struct_interpolated.fillna(data_struct_interpolated.mean(numeric_only=True), inplace=True)
 
 
             data_struct = {} 
@@ -474,7 +474,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         data['name'] = self.files[file_index]
         data['index'] = index
         flipped_data['index'] = flip_index
-
         # Add to extrema list if this score is on the extremes
         if self.isExtrema(data['category_id']):
             self.cached_extreme_inds.append(index)
@@ -494,7 +493,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         if index in self.cached_data:
-            if self.sample_extremes:
+            if self.sample_extremes and self.extremaLength() > 0:
                 extremaInd = index % self.extremaLength()
                 return copy.deepcopy(self.cached_data[self.cached_extreme_inds[extremaInd]])
             else:

@@ -34,7 +34,7 @@ flip_loss_mult = False
 turn_off_weight_decay = False       # Keep as False to use the configuration from the YAML file
 log_incrementally = True
 log_code = False
-
+os.environ['WANDB_MODE'] = 'offline'
 
 def train_simple(
         work_dir,
@@ -497,6 +497,7 @@ def evaluate_model(
 
             print('have pretrained model!')
         else:
+            print("checkpoint file: ", checkpoint_file)
             raise ValueError('The path to pretrained models does not exists')
     
 
@@ -770,6 +771,10 @@ def pretrain_model(
 
     if load_data:
         set_seed(0)
+
+        print("datasets are" ,datasets)
+        data_dirs = [d['data_source']['data_dir'] for d in datasets]
+        print(data_dirs)
         data_loaders = [
             torch.utils.data.DataLoader(dataset=call_obj(**d),
                                         batch_size=batch_size,

@@ -123,3 +123,8 @@ ENV/
 
 
 mmcv/mmcv/runner/__pycache__/runner.cpython-37.pyc
+v1.0rc1.zip
+requirements_oct2023.txt
+sample_data/data_loaders
+sample_data/model_zoo/alphapose_models
+sample_data/model_zoo/detectron_models

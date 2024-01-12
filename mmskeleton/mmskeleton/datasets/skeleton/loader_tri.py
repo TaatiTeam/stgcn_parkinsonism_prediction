@@ -7,6 +7,8 @@ import math
 import pandas as pd
 import copy
 from sklearn import preprocessing
+from icecream import ic
+
 
 class SkeletonLoaderTRI(torch.utils.data.Dataset):
     """ Feeder for skeleton-based action recognition
@@ -129,6 +131,7 @@ class SkeletonLoaderTRI(torch.utils.data.Dataset):
     def __len__(self):
         if self.flip_skels:
             return len(self.files)*2
+        print("__len__:  " , len(self.files))
         return len(self.files)
 
     def extremaLength(self):
@@ -224,7 +227,7 @@ class SkeletonLoaderTRI(torch.utils.data.Dataset):
             file_index = index - len(self.files)
 
         data_struct_interpolated = pd.read_csv(self.files[file_index], engine='python')
-        data_struct_interpolated.fillna(data_struct_interpolated.mean(), inplace=True)
+        data_struct_interpolated.fillna(data_struct_interpolated.mean(numeric_only=True), inplace=True)
 
         data_struct = {} 
         with open(self.files[file_index]) as f:        
@@ -234,6 +237,8 @@ class SkeletonLoaderTRI(torch.utils.data.Dataset):
                 for colname in row:
                     if colname not in data_struct:
                         try:
+                            # print(row)
+                            # print(colname)
                             data_struct[colname] = [float(row[colname])]
                         except ValueError as e:
                             data_struct[colname] = [row[colname]]

@@ -194,7 +194,7 @@ class SkeletonLoaderFasano(torch.utils.data.Dataset):
             file_index = index - len(self.files)
 
         data_struct_interpolated = pd.read_csv(self.files[file_index], engine='python')
-        data_struct_interpolated.fillna(data_struct_interpolated.mean(), inplace=True)
+        data_struct_interpolated.fillna(data_struct_interpolated.mean(numeric_only=True), inplace=True)
 
         data_struct = {} 
         with open(self.files[file_index]) as f:        

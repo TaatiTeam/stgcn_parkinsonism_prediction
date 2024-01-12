@@ -17,6 +17,7 @@ import shutil
 import random
 import time
 
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -24,69 +25,75 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
     np.random.seed(seed)
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
 
 # Clean names for WANDB logging
 def get_model_type(model_cfg):
-    model_type = ''
+    model_type = ""
 
-    if model_cfg['type'] == 'models.backbones.ST_GCN_18_ordinal_smaller_2_position_pretrain':
+    if (
+        model_cfg["type"] == "models.backbones.ST_GCN_18_ordinal_smaller_2_position_pretrain"
+        or model_cfg["type"] == "models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain"
+    ):
         model_type = "v2"
-    elif model_cfg['type'] == 'models.backbones.ST_GCN_18_ordinal_smaller_10_position_pretrain':
+    elif model_cfg["type"] == "models.backbones.ST_GCN_18_ordinal_smaller_10_position_pretrain":
         model_type = "v10"
-    elif model_cfg['type'] == 'models.backbones.ST_GCN_18_ordinal_smaller_11_position_pretrain':
+    elif model_cfg["type"] == "models.backbones.ST_GCN_18_ordinal_smaller_11_position_pretrain":
         model_type = "v11"
-    elif model_cfg['type'] == 'models.backbones.ST_GCN_18_ordinal_orig_position_pretrain':
+    elif model_cfg["type"] == "models.backbones.ST_GCN_18_ordinal_orig_position_pretrain":
         model_type = "v0"
-    elif model_cfg['type'] == 'models.backbones.ST_GCN_18_ordinal_orig_position_pretrain_dynamic_v1':
+    elif model_cfg["type"] == "models.backbones.ST_GCN_18_ordinal_orig_position_pretrain_dynamic_v1":
         model_type = "dynamic_v1"
-    elif model_cfg['type'] == 'models.backbones.cnn_custom_1_pretrain':
+    elif model_cfg["type"] == "models.backbones.cnn_custom_1_pretrain":
         model_type = "cnn_v1"
-    elif model_cfg['type'] == 'models.backbones.cnn_custom_2_pretrain':
+    elif model_cfg["type"] == "models.backbones.cnn_custom_2_pretrain":
         model_type = "cnn_v2"
-    elif model_cfg['type'] == 'models.backbones.cnn_custom_3_pretrain':
+    elif model_cfg["type"] == "models.backbones.cnn_custom_3_pretrain":
         model_type = "cnn_v3"
-    elif model_cfg['type'] == 'models.backbones.cnn_custom_4_pretrain':
+    elif model_cfg["type"] == "models.backbones.cnn_custom_4_pretrain":
         model_type = "cnn_v4"
 
-    else: 
-        model_type = model_cfg['type']
+    else:
+        model_type = model_cfg["type"]
 
     return model_type
+
 
 # Remove random cropping for validation and test sets
 def setup_eval_pipeline(pipeline):
     eval_pipeline = []
     for item in pipeline:
-        if item['type'] != "datasets.skeleton.scale_walk" and item['type'] != "datasets.skeleton.shear_walk":
-            if item['type'] == "datasets.skeleton.random_crop":
+        if item["type"] != "datasets.skeleton.scale_walk" and item["type"] != "datasets.skeleton.shear_walk":
+            if item["type"] == "datasets.skeleton.random_crop":
                 item_local = copy.deepcopy(item)
-                item_local['type'] = "datasets.skeleton.crop_middle"
+                item_local["type"] = "datasets.skeleton.crop_middle"
                 eval_pipeline.append(item_local)
             else:
                 eval_pipeline.append(item)
 
     return eval_pipeline
 
+
 # Processing a batch of data for label prediction
 # process a batch of data
 def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     try:
-        flip_loss_mult = kwargs['flip_loss_mult']
+        flip_loss_mult = kwargs["flip_loss_mult"]
     except:
         flip_loss_mult = 0
 
     try:
-        balance_classes = kwargs['balance_classes']
+        balance_classes = kwargs["balance_classes"]
     except:
         balance_classes = False
 
     try:
-        class_weights_dict = kwargs['class_weights_dict']
-        class_weights_dict = class_weights_dict[kwargs['workflow_stage']]
+        class_weights_dict = kwargs["class_weights_dict"]
+        class_weights_dict = class_weights_dict[kwargs["workflow_stage"]]
     except:
         class_weights_dict = {}
-    
+
     mse_loss = torch.nn.MSELoss()
     mae_loss = torch.nn.L1Loss()
     have_flips = 0
@@ -97,29 +104,29 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         data, data_flipped, label, name, num_ts, index, non_pseudo_label = datas
         have_flips = 1
 
-
-    # If we have both data and gait features, we need to remove them from the datastuct and 
+    # If we have both data and gait features, we need to remove them from the datastuct and
     # move them to he GPU separately
-    dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor  
+    dtype = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
 
-    gait_features = np.empty([1, 9])# default value if we dont have any gait features to load in
+    gait_features = np.empty([1, 9])  # default value if we dont have any gait features to load in
     if isinstance(data, dict):
         demo_data = {}
         for k in data.keys():
-            if k.startswith('demo_data'):
+            if k.startswith("demo_data"):
                 demo_data[k] = data[k]
 
-        gait_features = data['gait_feats'].type(dtype)
-        data = data['data'].type(dtype)
+        gait_features = data["gait_feats"].type(dtype)
+        data = data["data"].type(dtype)
 
     data_all = data.cuda()
     gait_features_all = gait_features.cuda()
     label = label.cuda()
+    non_pseudo_label = non_pseudo_label.cuda()
 
     # Remove the -1 labels (missing clinical score labels)
     y_true_all = label.data.reshape(-1, 1).float()
     non_pseudo_label = non_pseudo_label.data.reshape(-1, 1)
-    condition = y_true_all >= 0.
+    condition = y_true_all >= 0.0
 
     row_cond = condition.all(1)
     y_true = y_true_all[row_cond, :]
@@ -133,17 +140,17 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         model_2 = copy.deepcopy(model)
         data_all = data_all.data
         data_all_flipped = data_flipped.cuda()
-        data_all_flipped = data_all_flipped.data 
+        data_all_flipped = data_all_flipped.data
         output_all_flipped = model_2(data_all_flipped, gait_features_all)
-        torch.clamp(output_all_flipped, min=-1, max=num_class+1)
+        torch.clamp(output_all_flipped, min=-1, max=num_class + 1)
 
     # Get predictions from the model
     output_all = model(data_all, gait_features_all)
 
-    if torch.sum(output_all) == 0:        
+    if torch.sum(output_all) == 0:
         raise ValueError("=============================== got all zero output...")
     output = output_all[row_cond]
-    loss_flip_tensor = torch.tensor([0.], dtype=torch.float, requires_grad=True) 
+    loss_flip_tensor = torch.tensor([0.0], dtype=torch.float, requires_grad=True)
 
     if have_flips:
         loss_flip_tensor = mse_loss(output_all_flipped, output_all)
@@ -151,15 +158,15 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
             pass
 
     if not flip_loss_mult:
-        loss_flip_tensor = torch.tensor([0.], dtype=torch.float, requires_grad=True) 
+        loss_flip_tensor = torch.tensor([0.0], dtype=torch.float, requires_grad=True)
         loss_flip_tensor = loss_flip_tensor.cuda()
     else:
         loss_flip_tensor = loss_flip_tensor * flip_loss_mult
 
     # Calculate the label loss
-    non_pseudo_label = non_pseudo_label.reshape(1,-1).squeeze()
-    y_true_orig_shape = y_true.reshape(1,-1).squeeze()
-    y_true_all_orig_shape = y_true_all.reshape(1,-1).squeeze()
+    non_pseudo_label = non_pseudo_label.reshape(1, -1).squeeze()
+    y_true_orig_shape = y_true.reshape(1, -1).squeeze()
+    y_true_all_orig_shape = y_true_all.reshape(1, -1).squeeze()
     losses = loss(output, y_true)
 
     if balance_classes:
@@ -176,7 +183,7 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     output_list = np.clip(np.asarray(output_list), 0, num_class).tolist()
     y_pred_rounded = y_pred_rounded.reshape(1, -1).squeeze()
     y_pred_rounded = np.round(y_pred_rounded, 0)
-    y_pred_rounded = np.clip(y_pred_rounded, 0, num_class-1)
+    y_pred_rounded = np.clip(y_pred_rounded, 0, num_class - 1)
     preds = y_pred_rounded.squeeze().tolist()
 
     output_list_all = output_all.detach().cpu().numpy()
@@ -185,7 +192,7 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     output_list_all = output_list_all_rounded
     output_list_all_rounded = np.round(np.asarray(output_list_all_rounded), 0).tolist()
 
-    non_pseudo_label  = non_pseudo_label.data.tolist()
+    non_pseudo_label = non_pseudo_label.data.tolist()
     labels = y_true_orig_shape.data.tolist()
     y_true_all = y_true_all.data.squeeze().tolist()
 
@@ -196,17 +203,17 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
     if type(preds) is not list:
         preds = [preds]
     if type(output_list) is not list:
-        output_list = [output_list]    
+        output_list = [output_list]
     if type(num_ts) is not list:
         num_ts = [num_ts]
     if type(output_list_all) is not list:
         output_list_all = [output_list_all]
-
     if type(y_true_all) is not list:
         y_true_all = [y_true_all]
-
     if type(non_pseudo_label) is not list:
         non_pseudo_label = [non_pseudo_label]
+    if type(output_list_all_rounded) is not list:
+        output_list_all_rounded = [output_list_all_rounded]
 
     raw_labels = copy.deepcopy(labels)
 
@@ -214,29 +221,39 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         # Dealing with NaN and converting to ints
         labels = [0 if x != x else x for x in labels]
         preds = [0 if x != x else x for x in preds]
+        output_list = [0 if x != x else x for x in output_list]
+        output_list_all = [0 if x != x else x for x in output_list_all]
         labels = [int(round(cl)) for cl in labels]
         preds = [int(round(cl)) for cl in preds]
+
+
     except Exception as e:
         raise RuntimeError("Error converting NaNs to ints")
 
-
     overall_loss = losses + loss_flip_tensor
-    log_vars = dict(loss_label=losses.item(), loss_flip = loss_flip_tensor.item(), loss_all=overall_loss.item())
+    log_vars = dict(loss_label=losses.item(), loss_flip=loss_flip_tensor.item(), loss_all=overall_loss.item())
 
     try:
-        log_vars['mae_raw'] = mean_absolute_error(labels, output)
-        log_vars['mae_rounded'] = mean_absolute_error(labels, preds)
+        log_vars["mae_raw"] = mean_absolute_error(labels, output)
+        log_vars["mae_rounded"] = mean_absolute_error(labels, preds)
 
     except:
-        log_vars['mae_raw'] = math.nan
-        log_vars['mae_rounded'] = math.nan
+        log_vars["mae_raw"] = math.nan
+        log_vars["mae_rounded"] = math.nan
 
-
-    output_labels = dict(true=labels, raw_labels=y_true_all, non_pseudo_label=non_pseudo_label,\
-         pred=preds, raw_preds=output_list, raw_preds_all=output_list_all, round_preds_all=output_list_all_rounded, name=name, num_ts=num_ts)
+    output_labels = dict(
+        true=labels,
+        raw_labels=y_true_all,
+        non_pseudo_label=non_pseudo_label,
+        pred=preds,
+        raw_preds=output_list,
+        raw_preds_all=output_list_all,
+        round_preds_all=output_list_all_rounded,
+        name=name,
+        num_ts=num_ts,
+    )
     outputs = dict(loss=overall_loss, log_vars=log_vars, num_samples=len(labels), demo_data=demo_data)
     return outputs, output_labels, overall_loss
-
 
 
 # From: https://github.com/elliottzheng/AdaptiveWingLoss/blob/master/wing_loss.py
@@ -253,11 +270,10 @@ class WingLoss(nn.Module):
         # print(y.shape, y_hat.shape)
         dim = y_hat.shape
         # Make sure we only use the coordinates that the model is predicting
-        y = y[:, 0:dim[1], :, :]
+        y = y[:, 0 : dim[1], :, :]
         # print(y.shape, y_hat.shape)
 
         # input('stop')
-
 
         delta_y = (y - y_hat).abs()
         delta_y1 = delta_y[delta_y < self.omega]
@@ -271,19 +287,19 @@ class WingLoss(nn.Module):
 def weights_init_xavier(model):
     set_seed(0)
     classname = model.__class__.__name__
-    if classname.find('Conv1d') != -1:
+    if classname.find("Conv1d") != -1:
         torch.nn.init.xavier_uniform_(model.weight)
         if model.bias is not None:
             model.bias.data.fill_(0)
-    elif classname.find('Conv2d') != -1:
+    elif classname.find("Conv2d") != -1:
         torch.nn.init.xavier_uniform_(model.weight)
         if model.bias is not None:
             model.bias.data.fill_(0)
-    elif classname.find('Linear') != -1:
+    elif classname.find("Linear") != -1:
         torch.nn.init.xavier_uniform_(model.weight)
         if model.bias is not None:
             model.bias.data.fill_(0)
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find("BatchNorm") != -1:
         model.weight.data.normal_(1.0, 0.02)
         model.bias.data.fill_(0)
 
@@ -291,19 +307,19 @@ def weights_init_xavier(model):
 def weights_init(model):
     set_seed(0)
     classname = model.__class__.__name__
-    if classname.find('Conv1d') != -1:
+    if classname.find("Conv1d") != -1:
         model.weight.data.normal_(0.0, 0.02)
         if model.bias is not None:
             model.bias.data.fill_(0)
-    elif classname.find('Conv2d') != -1:
+    elif classname.find("Conv2d") != -1:
         model.weight.data.normal_(0.0, 0.02)
         if model.bias is not None:
             model.bias.data.fill_(0)
-    elif classname.find('Conv3d') != -1:
+    elif classname.find("Conv3d") != -1:
         model.weight.data.normal_(0.0, 0.02)
         if model.bias is not None:
             model.bias.data.fill_(0)
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find("BatchNorm") != -1:
         model.weight.data.normal_(1.0, 0.02)
         model.bias.data.fill_(0)
 
@@ -313,7 +329,6 @@ def weights_init_cnn(m):
         torch.nn.init.xavier_uniform_(m.weight.data)
         if m.bias is not None:
             m.bias.data.fill_(0.1)
-
 
     if isinstance(m, torch.nn.Conv3d):
         torch.nn.init.xavier_uniform_(m.weight.data)
@@ -326,12 +341,12 @@ def weights_init_cnn(m):
             m.bias.data.fill_(0.1)
 
 
-#https://discuss.pytorch.org/t/how-to-implement-weighted-mean-square-error/2547
+# https://discuss.pytorch.org/t/how-to-implement-weighted-mean-square-error/2547
 def weighted_mse_loss(input, target, weights):
-    # If the targets are not integers, then round them so that they match the 
+    # If the targets are not integers, then round them so that they match the
     # dictionary keys
 
-    # target_local = 
+    # target_local =
 
     error_per_sample = (input - target) ** 2
     numerator = 0
@@ -341,7 +356,7 @@ def weighted_mse_loss(input, target, weights):
     try:
         # print("weights: ", weights)
 
-        weights_list = [numerator / weights[int(round((i.data.tolist()[0])))]  for i in target]
+        weights_list = [numerator / weights[int(round((i.data.tolist()[0])))] for i in target]
     except Exception as e:
         print("target: ", target)
         print("weights: ", weights)
@@ -363,29 +378,30 @@ def weighted_mse_loss(input, target, weights):
 def weighted_mae_loss(input, target, weights):
     error_per_sample = abs(input - target)
     numerator = 0
-    
+
     for key in weights:
         numerator += weights[key]
 
-    weights_list = [numerator / weights[int(i.data.tolist()[0])]  for i in target]
+    weights_list = [numerator / weights[int(i.data.tolist()[0])] for i in target]
     weight_tensor = torch.FloatTensor(weights_list)
     weight_tensor = weight_tensor.unsqueeze(1).cuda()
 
     loss = torch.mul(weight_tensor, error_per_sample).mean()
     return loss
 
-#https://discuss.pytorch.org/t/how-to-implement-weighted-mean-square-error/2547
+
+# https://discuss.pytorch.org/t/how-to-implement-weighted-mean-square-error/2547
 def log_weighted_mse_loss(input, target, weights):
     error_per_sample = (input - target) ** 2
     numerator = 0
-    
+
     for key in weights:
         numerator += weights[key]
 
-    inv_weights_list = [numerator / weights[int(i.data.tolist()[0])]  for i in target]
+    inv_weights_list = [numerator / weights[int(i.data.tolist()[0])] for i in target]
 
     weight_tensor = torch.FloatTensor(inv_weights_list)
-    weight_tensor = torch.log(weight_tensor) # Take log of the tensor
+    weight_tensor = torch.log(weight_tensor)  # Take log of the tensor
     weight_tensor = weight_tensor.unsqueeze(1).cuda()
 
     loss = torch.mul(weight_tensor, error_per_sample).mean()
@@ -427,15 +443,23 @@ def getAllInputFiles(dataset_cfg):
     # if two datasets are provided, assume the second one is the independent test set (so one will not
     # be split off and created from the first dataset_cfg)
 
-    data_dir_all_data = dataset_cfg[0]['data_source']['data_dir']
-    first_dataset = [os.path.join(data_dir_all_data, f) for f in os.listdir(data_dir_all_data) if os.path.isfile(os.path.join(data_dir_all_data, f))] 
+    data_dir_all_data = dataset_cfg[0]["data_source"]["data_dir"]
+    first_dataset = [
+        os.path.join(data_dir_all_data, f)
+        for f in os.listdir(data_dir_all_data)
+        if os.path.isfile(os.path.join(data_dir_all_data, f))
+    ]
     have_second_dataset = False
     second_dataset = []
 
     if len(dataset_cfg) == 2:
         have_second_dataset = True
-        data_dir_second = dataset_cfg[1]['data_source']['data_dir']
-        second_dataset = [os.path.join(data_dir_second, f) for f in os.listdir(data_dir_second) if os.path.isfile(os.path.join(data_dir_second, f))] 
+        data_dir_second = dataset_cfg[1]["data_source"]["data_dir"]
+        second_dataset = [
+            os.path.join(data_dir_second, f)
+            for f in os.listdir(data_dir_second)
+            if os.path.isfile(os.path.join(data_dir_second, f))
+        ]
 
     first_dataset.sort()
     second_dataset.sort()
@@ -452,5 +476,3 @@ def initModel(model_cfg_local):
         model = call_obj(**model_cfg_local)
 
     return model
-
-
