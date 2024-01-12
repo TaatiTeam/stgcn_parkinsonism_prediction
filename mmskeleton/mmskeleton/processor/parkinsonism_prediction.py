@@ -770,6 +770,10 @@ def pretrain_model(
 
     if load_data:
         set_seed(0)
+
+        print("datasets are" ,datasets)
+        data_dirs = [d['data_source']['data_dir'] for d in datasets]
+        print(data_dirs)
         data_loaders = [
             torch.utils.data.DataLoader(dataset=call_obj(**d),
                                         batch_size=batch_size,

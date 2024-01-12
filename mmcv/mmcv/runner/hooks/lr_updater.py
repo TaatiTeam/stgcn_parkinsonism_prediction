@@ -299,7 +299,7 @@ class CyclicLrUpdaterHook(LrUpdaterHook):
             # print("runner.iter: " , runner.iter, "   curr_iter: ", curr_iter, '   base_lr:', base_lr)
             if self.anneal_after_cycle and curr_iter == 0 and runner.iter != 0:
                 self.local_base = self.local_base / self.anneal_ratio 
-                print("ANNEALING BASE LR: ", self.local_base , "*" * 50)
+                # print("ANNEALING BASE LR: ", self.local_base , "*" * 50)
 
             if start_iter <= curr_iter < end_iter:
                 progress = curr_iter - start_iter

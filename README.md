@@ -81,7 +81,7 @@ A simple training workflow is provided by this library, allowing for n-fold trai
 - A second data source will be exclusively used for evaluating the trained models. 
 
 
-A sample YAML file for the training workflow is provided in: `python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/train/train_cluster_2_120_pred_15_4_joints_do_0.2.yaml`
+A sample YAML file for the training workflow is provided in: `python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/train/train_example.yaml`
 
 Refer to the comments in this YAML file to appropriately modify the filepaths for these two datasets. 
 

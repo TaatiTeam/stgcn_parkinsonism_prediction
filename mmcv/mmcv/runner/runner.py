@@ -4,6 +4,8 @@ import os.path as osp
 import time
 import shutil
 
+from icecream import ic
+
 import math
 from torch import nn
 
@@ -605,7 +607,7 @@ class Runner(object):
             self.raw_labels = raw_labels
             self.non_pseudo_label = non_pseudo_label
 
-
+        self.early_stopping_epoch = self.epoch
         if self.early_stopping and not self.early_stopping_obj.early_stop and self.epoch >= self.es_start_up:
             self.es_before_step = self.early_stopping_obj.early_stop
             self.early_stopping_obj(batch_loss, self.model)
@@ -769,7 +771,8 @@ class Runner(object):
                     num_ts.extend(raw['num_ts'])
                     batch_loss += overall_loss*len(raw['true'])
                     self.visualize_preds_func(outputs, data_batch, True)
-                except:
+                except Exception as e:
+                    ic(e)
                     pass
 
                 try:

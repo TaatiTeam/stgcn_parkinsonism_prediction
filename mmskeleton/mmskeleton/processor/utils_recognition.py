@@ -208,12 +208,12 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         num_ts = [num_ts]
     if type(output_list_all) is not list:
         output_list_all = [output_list_all]
-
     if type(y_true_all) is not list:
         y_true_all = [y_true_all]
-
     if type(non_pseudo_label) is not list:
         non_pseudo_label = [non_pseudo_label]
+    if type(output_list_all_rounded) is not list:
+        output_list_all_rounded = [output_list_all_rounded]
 
     raw_labels = copy.deepcopy(labels)
 
@@ -221,8 +221,12 @@ def batch_processor(model, datas, train_mode, loss, num_class, **kwargs):
         # Dealing with NaN and converting to ints
         labels = [0 if x != x else x for x in labels]
         preds = [0 if x != x else x for x in preds]
+        output_list = [0 if x != x else x for x in output_list]
+        output_list_all = [0 if x != x else x for x in output_list_all]
         labels = [int(round(cl)) for cl in labels]
         preds = [int(round(cl)) for cl in preds]
+
+
     except Exception as e:
         raise RuntimeError("Error converting NaNs to ints")
 
