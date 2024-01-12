@@ -192,6 +192,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             self.cached_extreme_inds.append(index)
 
     def isExtrema(self, label):
+        print(label)
         if (label == 0 or label == self.extrema_range):
             return True
         return False
@@ -474,7 +475,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         data['name'] = self.files[file_index]
         data['index'] = index
         flipped_data['index'] = flip_index
-
         # Add to extrema list if this score is on the extremes
         if self.isExtrema(data['category_id']):
             self.cached_extreme_inds.append(index)
@@ -494,7 +494,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         if index in self.cached_data:
-            if self.sample_extremes:
+            if self.sample_extremes and self.extremaLength() > 0:
                 extremaInd = index % self.extremaLength()
                 return copy.deepcopy(self.cached_data[self.cached_extreme_inds[extremaInd]])
             else:

@@ -72,7 +72,7 @@ Modify this file as appropriate to specify the filepath of the dataset to evalua
 
 To run the evaluation workflow provide the appropriate YAML file to `mmskl.py`:
 ```
-    python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/eval/train_cluster_2_120_pred_15_4_joints_do_0.2.yaml
+    python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/eval/eval_example.yaml
 ```
 
 # Training
@@ -81,15 +81,25 @@ A simple training workflow is provided by this library, allowing for n-fold trai
 - A second data source will be exclusively used for evaluating the trained models. 
 
 
-A sample YAML file for the training workflow is provided in: `python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/train/train_example.yaml`
+A sample YAML file for the training workflow is provided in: `mmskeleton/configs/parkinsonism_prediction/detectron/train/train_example.yaml`
 
 Refer to the comments in this YAML file to appropriately modify the filepaths for these two datasets. 
 
 
 To run the training workflow provide the appropriate YAML file to `mmskl.py`:
 ```
-    python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/train/train_cluster_2_120_pred_15_4_joints_do_0.2.yaml
+    python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/train/train_example.yaml
 ```
+
+# Evaluation
+If you already have a model that has been trained with the training script and want to evaluate it on external data, you can just invoke the evaluation pipeline. 
+
+
+A sample YAML file for the evaluation workflow is provided in: `mmskeleton/configs/parkinsonism_prediction/detectron/eval/eval_example.yaml`
+
+# Debugging
+If you make changes to the dataloaders or models, be sure to delete the cached dataloaders and models in the model_zoo folder.
+
 
 # Citation
 Please cite our paper if this library helps your research:
