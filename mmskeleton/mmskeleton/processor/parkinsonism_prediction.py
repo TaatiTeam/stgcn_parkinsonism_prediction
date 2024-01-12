@@ -34,7 +34,7 @@ flip_loss_mult = False
 turn_off_weight_decay = False       # Keep as False to use the configuration from the YAML file
 log_incrementally = True
 log_code = False
-
+os.environ['WANDB_MODE'] = 'offline'
 
 def train_simple(
         work_dir,

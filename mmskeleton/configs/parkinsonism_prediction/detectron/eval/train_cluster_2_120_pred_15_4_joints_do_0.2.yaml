@@ -34,7 +34,7 @@ processor_cfg:
   train_extrema_for_epochs: 25
   do_position_pretrain: True
   model_save_root: "detectron_models"  # This is where we look for and save pretrained models
-  resource_root: "/home/saboa/code/stgcn_parkinsonsim_prediction/sample_data"
+  resource_root: "/home/saboa/code/stgcn_parkinsonism_prediction/sample_data"
 
   # model setting
   model_cfg:

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+from icecream import ic
 class ST_GCN_model(nn.Module):
     r"""Spatial temporal graph convolutional networks.
 
@@ -68,8 +68,12 @@ class ST_GCN_model(nn.Module):
         self.stage_2 = True
 
     def forward(self, x, gait_feats):
+        # ic(x)
+        ic(x.shape)
         x = x[:, 0 : self.in_channels, :, :, :]
 
+        ic(x.shape)
+        quit()
         # Fine-tuning
         if self.stage_2:
             x = self.encoder(x)  # STGCN output
