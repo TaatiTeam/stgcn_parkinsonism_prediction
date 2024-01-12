@@ -15,7 +15,7 @@ argparse_cfg:
 processor_cfg:
   type: 'processor.parkinsonism_prediction.eval'
   workers: 1
-  cv: 10
+  cv: 2
   exclude_cv: False
   notes: "two_part_loss"
   group_notes: "group_notes_here"
@@ -33,12 +33,12 @@ processor_cfg:
   head: "stgcn"
   train_extrema_for_epochs: 25
   do_position_pretrain: True
-  model_save_root: "alphapose_models"  # This is where we look for and save pretrained models
+  model_save_root: "detectron_models"  # This is where we look for and save pretrained models
   resource_root: "/home/saboa/code/stgcn_parkinsonism_prediction/sample_data"
 
   # model setting
   model_cfg:
-    type: 'models.backbones.ST_GCN_18_ordinal_orig_position_pretrain'
+    type: 'models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain'
     in_channels: 2
     num_class: 3                                # What is the range of UPDRS-gait scores available (num_class = 3 indicates 0->2 inclusive)
     edge_importance_weighting: True
@@ -59,7 +59,7 @@ processor_cfg:
     - type: "datasets.DataPipeline"
       data_source:
         type: "datasets.SkeletonLoaderTRI"
-        data_dir: tri_alphapose/stgcn_normalized_100_center_pd_no_norm
+        data_dir: tri_detectron/stgcn_normalized_100_center_pd_no_norm
         use_gait_feats: False
         num_track: 1
         num_keypoints: 13

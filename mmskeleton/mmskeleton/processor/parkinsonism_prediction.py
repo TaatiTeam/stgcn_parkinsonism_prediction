@@ -497,6 +497,7 @@ def evaluate_model(
 
             print('have pretrained model!')
         else:
+            print("checkpoint file: ", checkpoint_file)
             raise ValueError('The path to pretrained models does not exists')
     
 

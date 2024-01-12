@@ -39,7 +39,7 @@ processor_cfg:
 
   # model setting
   model_cfg:
-    type: 'models.backbones.ST_GCN_18_ordinal_smaller_2_position_pretrain'
+    type: 'models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain'
     in_channels: 2
     num_class: 1                                # What is the range of UPDRS-gait scores available (num_class = 3 indicates 0->2 inclusive)
     edge_importance_weighting: True
