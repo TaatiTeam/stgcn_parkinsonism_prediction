@@ -14,7 +14,7 @@ from sklearn.metrics import mean_absolute_error, accuracy_score, confusion_matri
 
 import pandas as pd
 import numpy as np
-
+from icecream import ic
 
 def computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, num_class, workflow, cv):
     raw_results_dict = {}
@@ -37,7 +37,7 @@ def computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, n
         for i in range(2, cv + 1):
             root_result_path_temp = os.path.join(root_result_path, str(i), mode+'.csv')
             df_temp = pd.read_csv(root_result_path_temp)
-            df_all = df_all.append(df_temp)
+            df_all = df_all._append(df_temp)
 
 
         df_all['demo_data_is_flipped'] = df_all.apply(label_flipped, axis=1)
@@ -83,7 +83,7 @@ def computeAllSummaryStats(work_dir, wandb_group, wandb_project, total_epochs, n
             log_vars = computeSummaryStats(df_test, num_class, mode)
             wandb.log(log_vars)
             df = pd.DataFrame(log_vars, index=[0])
-            results_table = results_table.append(df)
+            results_table = results_table._append(df)
 
             reg_fig_DBS, reg_fig_MEDS, con_mat_fig_normed, con_mat_fig = createSummaryPlots(df_test, num_class)
             wandb.log({"confusion_matrix/" + mode + "_final_confusion_matrix.png": con_mat_fig})
