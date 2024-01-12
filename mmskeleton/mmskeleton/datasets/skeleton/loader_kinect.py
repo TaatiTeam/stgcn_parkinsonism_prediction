@@ -192,7 +192,6 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
             self.cached_extreme_inds.append(index)
 
     def isExtrema(self, label):
-        print(label)
         if (label == 0 or label == self.extrema_range):
             return True
         return False

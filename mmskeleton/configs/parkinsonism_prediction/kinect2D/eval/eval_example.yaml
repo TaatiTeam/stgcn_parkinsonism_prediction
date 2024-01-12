@@ -15,7 +15,7 @@ argparse_cfg:
 processor_cfg:
   type: 'processor.parkinsonism_prediction.eval'
   workers: 1
-  cv: 10
+  cv: 2
   exclude_cv: False
   notes: "two_part_loss"
   group_notes: "group_notes_here"
@@ -38,7 +38,7 @@ processor_cfg:
 
   # model setting
   model_cfg:
-    type: 'models.backbones.ST_GCN_18_ordinal_smaller_2_position_pretrain'
+    type: 'models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain'
     in_channels: 2
     num_class: 3                                # What is the range of UPDRS-gait scores available (num_class = 3 indicates 0->2 inclusive)
     edge_importance_weighting: True
@@ -69,7 +69,7 @@ processor_cfg:
         missing_joint_val: mean
         cache: True
         flip_skels: True
-        extrema_range: 2        # What is the highest score in this dataset
+        extrema_range: 1        # What is the highest score in this dataset
         export_2d: True
 
 
