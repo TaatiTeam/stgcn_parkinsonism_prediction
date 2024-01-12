@@ -30,7 +30,6 @@ class ST_GCN_18_position_pretrain_model(ST_GCN_model):
                  graph_cfg,
                  ST_GCN_encoder,
                  **kwargs):
-        print("THIS\n",kwargs)
         super().__init__(in_channels, num_class, graph_cfg, **kwargs)
         print('In ST_GCN_18_ordinal_orig_position_pretrain: ', graph_cfg)
         print(kwargs)

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 
 from icecream import ic
+
+
 class ST_GCN_model(nn.Module):
     r"""Spatial temporal graph convolutional networks.
 
@@ -68,16 +70,13 @@ class ST_GCN_model(nn.Module):
         self.stage_2 = True
 
     def forward(self, x, gait_feats):
-        # ic(x)
-        ic(x.shape)
         x = x[:, 0 : self.in_channels, :, :, :]
 
-        ic(x.shape)
-        quit()
+        # Pass through encoder in all cases
+        x = self.encoder(x)
         # Fine-tuning
         if self.stage_2:
-            x = self.encoder(x)  # STGCN output
-
+            # STGCN output
             gait_feats = gait_feats.view(gait_feats.size(0), gait_feats.size(1), 1, 1)
 
             # If we have gait feaures, then combine at the feature level
@@ -96,17 +95,9 @@ class ST_GCN_model(nn.Module):
 
         # Pretraining
         else:
-            # print("============================================")
-            # print('input is of size: ', x.size())
-            x = self.encoder(x)
-
             x = self.head(x)
-            # print('shape of x before reshaping is: ', x.size())
             # reshape the output to be of size (13x2xnum_ts)
             x = x.view(x.size(0), self.in_channels, self.num_joints_predicting, -1)
-
-            # print('shape of x after reshaping is: ', x.size())
-
         return x
 
     pass

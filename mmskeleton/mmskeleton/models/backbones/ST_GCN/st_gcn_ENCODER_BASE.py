@@ -40,7 +40,6 @@ class ST_GCN_encoder(nn.Module):
         self.in_channels = in_channels
         self.num_class = num_class
 
-        ic(kwargs)
         super().__init__()
 
         # load graph
