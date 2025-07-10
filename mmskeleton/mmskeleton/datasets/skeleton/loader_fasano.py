@@ -393,15 +393,15 @@ class SkeletonLoaderFasano(torch.utils.data.Dataset):
         num_channel = len(channel)
 
         dbs = data_struct['DBS'][0]
-        if dbs is "":
+        if dbs == "":
             dbs = -1.0
 
         meds = data_struct['MEDS'][0]
-        if meds is "":
+        if meds == "":
             meds = -1.0
 
         age = data_struct['age'][0]
-        if age is "":
+        if age == "":
             age = -1.0
 
         sex = -1.0

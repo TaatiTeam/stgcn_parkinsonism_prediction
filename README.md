@@ -23,6 +23,7 @@ This code was tested on Linux 20.04 with Python 3.8.12, Pytorch 2.1.0, and Cuda 
  - Install dependencies:
     ```
     python -m pip install pip==23.0
+    python -m pip install setuptools==58.2.0
     python -m pip install Cython numpy ninja
     python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     python -m pip install -r requirements.txt

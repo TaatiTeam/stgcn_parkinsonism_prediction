@@ -1,0 +1,158 @@
+argparse_cfg:
+  gpus:
+    bind_to: processor_cfg.gpus
+    help: number of gpus
+  work_dir:
+    bind_to: processor_cfg.work_dir
+    help: the dir to save logs and models
+  batch_size:
+    bind_to: processor_cfg.batch_size
+  resume_from:
+    bind_to: processor_cfg.resume_from
+    help: the checkpoint file to resume from
+
+
+processor_cfg:
+  type: 'processor.parkinsonism_prediction_LOSOCV.train_simple'
+  workers: 4
+  cv: 1
+  test_ids: [27, 33, 34, 37, 39, 46, 47, 48, 50, 52, 55, 57, 59, 66]
+  exclude_cv: True
+  notes: "two_part_loss"
+  group_notes: "jul10_2025"
+  weight_classes: True
+  flip_loss: 1
+  launch_from_local: True
+  wandb_project: "RELEASE_DEV_train"
+  early_stopping: True
+  force_run_all_epochs: False
+  es_patience_1: 25
+  es_start_up_1: 1
+  es_patience_2: 25
+  es_start_up_2: 30
+  freeze_encoder: False
+  head: "stgcn"
+  train_extrema_for_epochs: 25
+  do_position_pretrain: True
+  model_save_root: "kinect3d_models_july9"  # This is where we look for and save pretrained models
+  # resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"  # Resource root of data and models
+  # resource_root: "/home/saboa/code/stgcn_parkinsonism_prediction/sample_data"
+  resource_root: "/home/saboa/data/shared_from_cluster"
+
+  # model setting
+  model_cfg:
+    type: 'models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain'
+    in_channels: 3
+    num_class: 3                                # What is the range of UPDRS-gait scores available (num_class = 3 indicates 0->2 inclusive)
+    edge_importance_weighting: True
+    dropout: 0.1
+    num_ts_predicting: 1
+    num_joints_predicting: 4
+    temporal_kernel_size: 13
+    graph_cfg:
+      layout: 'kinect_coco_simplified_head'
+      strategy: 'spatial'
+  loss_cfg:
+    - {type: 'mmskeleton.processor.utils_recognition.WingLoss'} # This is for pretraining
+    - {type: 'torch.nn.MSELoss'} # This is for finetuning
+    
+
+  # dataset setting
+  dataset_cfg:
+    # data to train/val on
+    - type: "datasets.DataPipeline"
+      data_source:
+        type: "datasets.SkeletonLoaderKinect"
+        # data_dir: kinect_skel_data_3d/kinect_all
+        data_dir: May2023_with_clinical/all
+        use_gait_feats: False       # For pretraining should generally be set to false
+        num_track: 1
+        num_keypoints: 13
+        repeat: 1
+        outcome_label: UPDRS_gait
+        csv_loader: True
+        missing_joint_val: mean
+        cache: True
+        flip_skels: True
+        extrema_range: 2        # What is the highest score in this dataset
+
+
+      # This pipeline is for stage 1 (pretraining)
+      pipeline:
+        - {type: "datasets.skeleton.kinect3D_centre_hip", centre: [0, 0, 0]}
+        - {type: "datasets.skeleton.normalize_by_resolution"}
+        - {type: "datasets.skeleton.mask_by_visibility"}       
+        - {type: "datasets.skeleton.pad_zero_beginning_for_joint_prediction", size: 120, pred_ts: [15]  }
+        - {type: "datasets.skeleton.random_crop_for_joint_prediction", size: 120, pred_ts: [15] }
+        - {type: "datasets.skeleton.select_joints_for_label", joints: [5, 6, 11, 12]}
+        - {type: "datasets.skeleton.transpose", order: [0, 2, 1, 3]}
+        - {type: "datasets.skeleton.to_tuple"}
+
+
+    # Data to test on
+    - type: "datasets.DataPipeline"
+      data_source:
+        type: "datasets.SkeletonLoaderKinect"
+        data_dir: May2023_with_clinical/pd_previous_subset
+        use_gait_feats: True
+        num_track: 1
+        num_keypoints: 13
+        repeat: 1
+        outcome_label: UPDRS_gait
+        csv_loader: True
+        missing_joint_val: mean
+        cache: True
+        flip_skels: True
+        extrema_range: 2        # What is the highest score in this dataset
+
+
+      # This pipeline is for stage 2 (finetuning)
+      pipeline:
+        - {type: "datasets.skeleton.kinect3D_centre_hip", centre: [100, 100, 100]}
+        - {type: "datasets.skeleton.normalize_by_resolution"}
+        - {type: "datasets.skeleton.mask_by_visibility"}
+        - {type: "datasets.skeleton.pad_zero_beginning", size: 120 }
+        - {type: "datasets.skeleton.random_crop", size: 120 }
+        - {type: "datasets.skeleton.transpose", order: [0, 2, 1, 3]}
+        - {type: "datasets.skeleton.to_tuple"}
+
+  # dataloader setting
+  batch_size: 100
+  gpus: 1
+
+  # optimizer setting
+  optimizer_cfg:
+    # Pretrain
+    - {type: 'torch.optim.SGD',
+    lr: 0.0001,
+    momentum: 0.9,
+    nesterov: true,
+    weight_decay: 0.00000}
+
+    # Fine tuning
+    - {type: 'torch.optim.SGD',
+    lr: 0.001,
+    momentum: 0.9,
+    nesterov: true,
+    weight_decay: 0.0000}
+
+  # runtime setting
+  workflow: [['train', 1], ['val', 1]] #, ['test', 1]]
+  work_dir: ./work_dir/parkinsonism_prediction/  # Where should the results be saved?
+  total_epochs: 1000
+  training_hooks:
+    lr_config:
+      policy: 'cyclic'
+      cyclic_times: 50
+      step_ratio_up: 0.2
+      target_ratio: !!python/tuple [10, 0.00001]
+    log_config:
+      interval: 1000
+      hooks:
+        - type: WandbLoggerHook
+    checkpoint_config:
+      interval: 200
+    optimizer_config:
+      grad_clip:
+  resume_from:
+  load_from:

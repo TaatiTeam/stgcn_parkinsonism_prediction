@@ -6,6 +6,33 @@ import time
 
 data_fields = ['data', 'data_flipped']
 
+def kinect3D_centre_hip(data, centre):
+    hip_joint_name = "Sacr"
+    channel = data['info']['keypoint_channels']
+    joints = data['keypoint_order']
+    lhip_i = joints.index("LHip")
+    rhip_i = joints.index("RHip")
+
+    centre = np.asarray(centre)
+    for data_field in data_fields:
+        if data_field not in data.keys():
+            continue
+
+        np_array = data[data_field]
+        l_hip_data = np_array[:, lhip_i, :, :]
+        r_hip_data = np_array[:, rhip_i, :, :]
+        hip_mean = (l_hip_data + r_hip_data) / 2.0 
+        hip_mean = np.expand_dims(hip_mean, axis=1)
+        delta = centre.reshape((3,1,1, 1))
+        delta = delta - hip_mean
+
+        np_array += delta
+        
+        data[data_field] = np_array
+
+
+    return data
+
 def normalize_by_resolution(data):
     
     resolution = data['info']['resolution']
@@ -319,7 +346,7 @@ def random_crop_for_joint_prediction(data, size, pred_ts):
         num_joints = input_shape[1]
         T = np_array.shape[2] - max_future_ts # This is number of admissible timesteps in the walk
         if T > size:
-            if begin is -1:
+            if begin == -1:
                 begin = random.randint(0, T - size)
             data[data_field] = np_array[:, :, begin:begin + size, :]
 
