@@ -16,15 +16,15 @@ processor_cfg:
   type: 'processor.parkinsonism_prediction_LOSOCV.train_simple'
   workers: 4
   cv: 1
-  test_ids: [27, 33, 34, 37, 39, 46, 47, 48, 50, 52, 55, 57, 59, 66]
+  test_ids: [-1]
   exclude_cv: True
   notes: "two_part_loss"
-  group_notes: "jul10_2025"
+  group_notes: "train_all_participants_TO_SHARE_JULY11_dev"
   weight_classes: True
   flip_loss: 1
   launch_from_local: True
-  wandb_project: "RELEASE_DEV_train"
-  early_stopping: True
+  wandb_project: "RELEASE_DEV_train_ALL_TO_SHARE_FINAL_JUL11"
+  early_stopping: False
   force_run_all_epochs: False
   es_patience_1: 25
   es_start_up_1: 1
@@ -34,7 +34,7 @@ processor_cfg:
   head: "stgcn"
   train_extrema_for_epochs: 25
   do_position_pretrain: True
-  model_save_root: "kinect3d_models_july9"  # This is where we look for and save pretrained models
+  model_save_root: "kinect3d_models_july11_to_share"  # This is where we look for and save pretrained models
   # resource_root: "/home/saboa/data/OBJECTIVE_2_ML_DATA"  # Resource root of data and models
   # resource_root: "/home/saboa/code/stgcn_parkinsonism_prediction/sample_data"
   resource_root: "/home/saboa/data/shared_from_cluster"
@@ -94,7 +94,7 @@ processor_cfg:
       data_source:
         type: "datasets.SkeletonLoaderKinect"
         data_dir: May2023_with_clinical/pd_previous_subset
-        use_gait_feats: True
+        use_gait_feats: False
         num_track: 1
         num_keypoints: 13
         repeat: 1
@@ -138,8 +138,8 @@ processor_cfg:
 
   # runtime setting
   workflow: [['train', 1], ['val', 1]] #, ['test', 1]]
-  work_dir: ./work_dir/parkinsonism_prediction/  # Where should the results be saved?
-  total_epochs: 1000
+  work_dir: ./work_dir/parkinsonism_prediction_train_on_all_to_share/  # Where should the results be saved?
+  total_epochs: 45
   training_hooks:
     lr_config:
       policy: 'cyclic'

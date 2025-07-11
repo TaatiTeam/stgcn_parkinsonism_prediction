@@ -135,10 +135,10 @@ def computeSummaryStats(df_all, num_class, mode):
     average_metrics_to_log = ['precision', 'recall', 'f1score', 'support']
     prefix_name = mode + '/'
     for av in average_types:
-        results_tuple = precision_recall_fscore_support(true_labels, preds, average=av)
+        results_tuple = precision_recall_fscore_support(true_labels, preds, average=av, labels=class_names_int)
+
         for m in range(len(average_metrics_to_log)):      
             log_vars[prefix_name +  average_metrics_to_log[m] +'_average_' + av] = results_tuple[m]
-
 
     # Calculate metrics per class
     results_tuple = precision_recall_fscore_support(true_labels, preds, average=None, labels=class_names_int)

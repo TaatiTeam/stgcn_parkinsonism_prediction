@@ -146,15 +146,25 @@ def train_simple(
         id_mapping = {27:25, 33:31, 34:32, 37:35, 39:37,
                   46:44, 47:45, 48:46, 50:48, 52:50, 
                   55:53, 57:55, 59:57, 66:63}
-
-        ambid = id_mapping[test_id]
+        try:
+            ambid = id_mapping[test_id]
+            
+            # These are all of the walks (both labelled and not) of the test participant and cannot be included in training data
+            val_set_stage_1 = [i for i in all_files if re.search('ID_'+str(test_id), i) ]
+            train_set_stage1 = list(set(all_files).symmetric_difference(set(val_set_stage_1)))
+            
+            val_set_stage_2 = [i for i in all_files_pd if re.search('ID_'+str(test_id), i) ]
+            train_set_stage2 = list(set(all_files_pd).symmetric_difference(set(val_set_stage_2)))
+        except Exception as e:
+            print("Could not find this id, training on all")
+            ambid = "all"
+            val_set_stage_1 = all_files
+            train_set_stage1 = all_files
+            
+            val_set_stage_2 = all_files_pd
+            train_set_stage2 = all_files_pd
         
-        # These are all of the walks (both labelled and not) of the test participant and cannot be included in training data
-        val_set_stage_1 = [i for i in all_files if re.search('ID_'+str(test_id), i) ]
-        train_set_stage1 = list(set(all_files).symmetric_difference(set(val_set_stage_1)))
         
-        val_set_stage_2 = [i for i in all_files_pd if re.search('ID_'+str(test_id), i) ]
-        train_set_stage2 = list(set(all_files_pd).symmetric_difference(set(val_set_stage_2)))
         work_dir_amb = work_dir + "/" + str(ambid)
 
 
@@ -179,7 +189,7 @@ def train_simple(
                 fold += 1
 
                 path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
-                                            str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold), str(ambid), centre)
+                                            str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold), str(ambid), centre, "gait_feats_" + str(model_cfg['use_gait_features']))
 
                 if not os.path.exists(path_to_pretrained_model):
                     os.makedirs(path_to_pretrained_model)
@@ -232,7 +242,7 @@ def train_simple(
 
                 print('stage_1_train: ', len(train_walks))
                 print('stage_1_val: ', len(val_walks))
-                print('stage_1_test: ', len(test_walks))
+                # print('stage_1_test: ', len(test_walks))
 
 
                 pretrained_model = pretrain_model(
@@ -291,6 +301,10 @@ def train_simple(
                 # Reset the head for finetuning
                 pretrained_model.module.set_stage_2()
                 pretrained_model.module.head.apply(weights_init_xavier)
+
+                print('stage_2_train: ', len(train_set_stage2))
+                print('stage_2_val: ', len(val_set_stage_2))
+                # print('stage_2_test: ', len(test_walks))
 
                 things_to_log = {'num_reps_pd': fold, 'do_position_pretrain': do_position_pretrain, 'fold': fold, 'train_extrema_for_epochs': train_extrema_for_epochs, 'supcon_head': head, 'freeze_encoder': freeze_encoder, 'es_start_up_2': es_start_up_2, 'es_patience_2': es_patience_2, 'force_run_all_epochs': force_run_all_epochs, 'early_stopping': early_stopping, 'weight_classes': weight_classes, 'keypoint_layout': model_cfg['graph_cfg']['layout'], 'outcome_label': outcome_label, 'num_class': num_class, 'wandb_project': wandb_project, 'wandb_group': wandb_group, 'test_AMBID': ambid, 'test_AMBID_num': len(test_walks), 'model_cfg': model_cfg, 'loss_cfg': loss_cfg_stage_2, 'optimizer_cfg': optimizer_cfg_stage_2, 'dataset_cfg_data_source': dataset_cfg[0]['data_source'], 'notes': notes, 'batch_size': batch_size, 'total_epochs': total_epochs }
                 _, num_epochs = finetune_model(work_dir_amb,
