@@ -112,7 +112,7 @@ def eval(
     # Set the paths for input and output
     work_dir = os.path.join(resource_root, work_dir, wandb_group)
     wandb_log_local_group = os.path.join(resource_root, 'wandb', wandb_local_id)
-    model_zoo_root = os.path.join(resource_root, 'model_zoo')
+    # model_zoo_root = model_save_root
     dataloader_temp = os.path.join(resource_root, 'data_loaders')
     local_data_base = os.path.join(resource_root, 'data')
 
@@ -133,10 +133,9 @@ def eval(
 
         for fold in range(1, cv + 1):
             plt.close('all')
-            path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
-                                        str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold))
 
-            path_to_pretrained_model = os.path.join(model_zoo_root, model_save_root, model_type, \
+
+            path_to_pretrained_model = os.path.join(model_save_root, model_type, \
                                             str(model_cfg['temporal_kernel_size']), str(model_cfg['dropout']), str(fold), str(ambid), centre, "gait_feats_" + str(model_cfg['use_gait_features']))
 
 

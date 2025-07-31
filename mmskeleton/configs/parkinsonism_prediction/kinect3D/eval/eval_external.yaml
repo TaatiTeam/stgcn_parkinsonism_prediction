@@ -14,17 +14,17 @@ argparse_cfg:
 processor_cfg:
   type: 'processor.parkinsonism_prediction_kinect_eval.eval'
   workers: 1
-  cv: 1 # how many cv folds did you train during the training step. These pretrained models already need to exist
+  cv: 1 # how many cv folds you trained during the training process. These pretrained models already need to exist. We are sharing one model trained on all data so this is set to 1.
   notes: "two_part_loss"
   group_notes: "eval_all_participants_TO_SHARE_JULY31_dev"
   wandb_project: "RELEASE_DEV_eval_ALL_TO_SHARE_FINAL_JUL31"
   freeze_encoder: False
   head: "stgcn"
-  model_save_root: "kinect3d_models_july31_to_share"  # This is where we look for and save pretrained models
-  resource_root: "/home/saboa/data/shared_from_cluster"
-  compute_stats: True # need to have at least a subset of labelled data to enable this
+  model_save_root: "./sample_data/model_zoo/kinect3d_models_to_share"  # This is where we look for and save pretrained models. This does not need to be changed to used the models included in this repo, note: We changed how this is used in file/processor.parkinsonism_prediction_kinect_eval.eval to set up a working example with the shared models. The other (ie. training) files use this field differently.
+  resource_root: "/home/saboa/data/shared_from_cluster"                # Root of where your data/dataloaders are. Note that this is not being used for the model zoo path in this config (see above)
+  compute_stats: True                                                  # Need to have at least a subset of labelled data to enable this
 
-  # model setting
+  # model setting. These need to align with the pretrained model. These match with the shared Kinect3D model
   model_cfg:
     type: 'models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain'
     in_channels: 3
@@ -38,7 +38,7 @@ processor_cfg:
       layout: 'kinect_coco_simplified_head'
       strategy: 'spatial'
   loss_cfg:
-    - {type: 'torch.nn.MSELoss'} # This is for finetuning
+    - {type: 'torch.nn.MSELoss'} 
     
 
   # dataset setting
@@ -47,7 +47,7 @@ processor_cfg:
     - type: "datasets.DataPipeline"
       data_source:
         type: "datasets.SkeletonLoaderKinect"
-        data_dir: May2023_with_clinical/pd_previous_subset
+        data_dir: May2023_with_clinical/pd_previous_subset # change this to where your data is. can contain a mixture of labelled and unlabelled data if desired. A prediction will be output for each walk and a flip version of the walk
         use_gait_feats: False
         num_track: 1
         num_keypoints: 13
@@ -60,12 +60,13 @@ processor_cfg:
         extrema_range: 2        # What is the highest score in this dataset
 
 
+      # This matches with the training configuration
       pipeline:
         - {type: "datasets.skeleton.kinect3D_centre_hip", centre: [0, 0, 0]}
         - {type: "datasets.skeleton.normalize_by_resolution"}
         - {type: "datasets.skeleton.mask_by_visibility"}
         - {type: "datasets.skeleton.pad_zero_beginning", size: 120 }
-        - {type: "datasets.skeleton.crop_middle", size: 120 }
+        - {type: "datasets.skeleton.crop_middle", size: 120 }         # NOTE: even if this is set to random_crop, it will be replaced by crop_middle for reproducibility 
         - {type: "datasets.skeleton.transpose", order: [0, 2, 1, 3]}
         - {type: "datasets.skeleton.to_tuple"}
 
