@@ -291,6 +291,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
                     'LKnee', 'RKnee',
                     'LAnkle', 'RAnkle',
                 ]
+                self.order_of_keypoints = order_of_keypoints
 
             else:
                 raise ValueError(f"The layout {self.layout} does not exist")
@@ -436,6 +437,8 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
         data['data'] = np.zeros(
             (num_channel, num_keypoints, num_frame, self.num_track),
             dtype=np.float32)
+        
+        data['keypoint_order'] = self.order_of_keypoints
 
         for a in annotations:
             person_id = a['id'] if a['person_id'] is None else a['person_id']
@@ -487,6 +490,7 @@ class SkeletonLoaderKinect(torch.utils.data.Dataset):
 
         if self.flip_skels and return_flip:
             return flipped_data
+
 
         return data
 

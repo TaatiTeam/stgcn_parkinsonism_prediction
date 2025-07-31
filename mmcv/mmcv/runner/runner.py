@@ -936,7 +936,7 @@ class Runner(object):
                     mode, epochs = flow
 
                     if mode == 'train':
-                        self._max_iters = self._max_epochs * len(data_loaders[i])
+                        self._max_iters = max(self._max_epochs, 1000) * len(data_loaders[i])
                         break
 
                 work_dir = self.work_dir if self.work_dir is not None else 'NONE'
@@ -1040,10 +1040,12 @@ class Runner(object):
                 self.model.load_state_dict(torch.load(es_checkpoint))
                 self.model.eval()
                 self.early_stop_eval(workflow, data_loaders, **kwargs)
-            else:
-                pass
 
-
+        else:
+            # No early stopping, so just evaluate the latest model
+            if not self.pretrain_mode:
+                self.model.eval()
+                self.early_stop_eval(workflow, data_loaders, **kwargs)
 
         time.sleep(10)  # wait for some hooks like loggers to finish
         self.call_hook('after_run')

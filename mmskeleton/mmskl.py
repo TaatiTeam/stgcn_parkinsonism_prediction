@@ -5,6 +5,7 @@ import logging
 
 import torch
 # import spacecutter
+import mmdet.apis
 import mmskeleton
 
 # from SubContrast.losses import SupConLoss

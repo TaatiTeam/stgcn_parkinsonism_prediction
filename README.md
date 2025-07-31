@@ -23,6 +23,7 @@ This code was tested on Linux 20.04 with Python 3.8.12, Pytorch 2.1.0, and Cuda 
  - Install dependencies:
     ```
     python -m pip install pip==23.0
+    python -m pip install setuptools==58.2.0
     python -m pip install Cython numpy ninja
     python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     python -m pip install -r requirements.txt
@@ -73,6 +74,19 @@ Modify this file as appropriate to specify the filepath of the dataset to evalua
 To run the evaluation workflow provide the appropriate YAML file to `mmskl.py`:
 ```
     python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/eval/eval_example.yaml
+```
+
+## External validation on 3D Kinect models (example)
+We have provided a ready-to-run script to facilitate external validation of our Kinect3D pretrained models. These pretrained models are available in the `sample_data/model_zoo/kinect3d_models_to_share` folder. To run this external validation on your data, change the following variables in the `mmskeleton/configs/parkinsonism_prediction/kinect3D/eval/eval_external.yaml` file:
+
+- processor_cfg.resource_root
+- dataset_cfg.data_source.data_dir  (location of your input data, relative to the resource_root)
+- processor_cfg.compute_stats        (set to false if you do not have any labelled data)
+
+
+Then evaluation can be conducted with: 
+```
+python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/kinect3D/eval/eval_external.yaml 
 ```
 
 # Training

@@ -1,0 +1,106 @@
+argparse_cfg:
+  gpus:
+    bind_to: processor_cfg.gpus
+    help: number of gpus
+  work_dir:
+    bind_to: processor_cfg.work_dir
+    help: the dir to save logs and models
+  batch_size:
+    bind_to: processor_cfg.batch_size
+  resume_from:
+    bind_to: processor_cfg.resume_from
+    help: the checkpoint file to resume from
+
+processor_cfg:
+  type: 'processor.parkinsonism_prediction_kinect_eval.eval'
+  workers: 1
+  cv: 1 # how many cv folds you trained during the training process. These pretrained models already need to exist. We are sharing one model trained on all data so this is set to 1.
+  notes: "two_part_loss"
+  group_notes: "eval_all_participants_TO_SHARE_JULY31_dev"
+  wandb_project: "RELEASE_DEV_eval_ALL_TO_SHARE_FINAL_JUL31"
+  freeze_encoder: False
+  head: "stgcn"
+  model_save_root: "./sample_data/model_zoo/kinect3d_models_to_share"  # This is where we look for and save pretrained models. This does not need to be changed to used the models included in this repo, note: We changed how this is used in file/processor.parkinsonism_prediction_kinect_eval.eval to set up a working example with the shared models. The other (ie. training) files use this field differently.
+  resource_root: "/home/saboa/data/shared_from_cluster"                # Root of where your data/dataloaders are. Note that this is not being used for the model zoo path in this config (see above)
+  compute_stats: True                                                  # Need to have at least a subset of labelled data to enable this
+
+  # model setting. These need to align with the pretrained model. These match with the shared Kinect3D model
+  model_cfg:
+    type: 'models.backbones.ST_GCN.ST_GCN_18_ordinal_smaller_2_position_pretrain'
+    in_channels: 3
+    num_class: 3                                # What is the range of UPDRS-gait scores available (num_class = 3 indicates 0->2 inclusive)
+    edge_importance_weighting: True
+    dropout: 0.1
+    num_ts_predicting: 1
+    num_joints_predicting: 4
+    temporal_kernel_size: 13
+    graph_cfg:
+      layout: 'kinect_coco_simplified_head'
+      strategy: 'spatial'
+  loss_cfg:
+    - {type: 'torch.nn.MSELoss'} 
+    
+
+  # dataset setting
+  dataset_cfg:
+    # data to evaluate on
+    - type: "datasets.DataPipeline"
+      data_source:
+        type: "datasets.SkeletonLoaderKinect"
+        data_dir: May2023_with_clinical/pd_previous_subset # change this to where your data is. can contain a mixture of labelled and unlabelled data if desired. A prediction will be output for each walk and a flip version of the walk
+        use_gait_feats: False
+        num_track: 1
+        num_keypoints: 13
+        repeat: 1
+        outcome_label: UPDRS_gait
+        csv_loader: True
+        missing_joint_val: mean
+        cache: True
+        flip_skels: True
+        extrema_range: 2        # What is the highest score in this dataset
+
+
+      # This matches with the training configuration
+      pipeline:
+        - {type: "datasets.skeleton.kinect3D_centre_hip", centre: [0, 0, 0]}
+        - {type: "datasets.skeleton.normalize_by_resolution"}
+        - {type: "datasets.skeleton.mask_by_visibility"}
+        - {type: "datasets.skeleton.pad_zero_beginning", size: 120 }
+        - {type: "datasets.skeleton.crop_middle", size: 120 }         # NOTE: even if this is set to random_crop, it will be replaced by crop_middle for reproducibility 
+        - {type: "datasets.skeleton.transpose", order: [0, 2, 1, 3]}
+        - {type: "datasets.skeleton.to_tuple"}
+
+  # dataloader setting
+  batch_size: 100
+  gpus: 1
+
+  # optimizer setting
+  optimizer_cfg:
+    # Fine tuning
+    - {type: 'torch.optim.SGD',
+    lr: 0.001,
+    momentum: 0.9,
+    nesterov: true,
+    weight_decay: 0.0000}
+
+  # runtime setting
+  workflow: [['test', 1]]
+  work_dir: ./work_dir/parkinsonism_prediction/  # Where should the results be saved?
+  total_epochs: 1000
+  training_hooks:
+  training_hooks:
+    lr_config:
+      policy: 'cyclic'
+      cyclic_times: 50
+      step_ratio_up: 0.2
+      target_ratio: !!python/tuple [10, 0.00001]
+    log_config:
+      interval: 1000
+      hooks:
+        - type: WandbLoggerHook
+    checkpoint_config:
+      interval: 200
+    optimizer_config:
+      grad_clip:
+  resume_from:
+  load_from:
