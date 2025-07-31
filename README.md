@@ -76,6 +76,19 @@ To run the evaluation workflow provide the appropriate YAML file to `mmskl.py`:
     python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/detectron/eval/eval_example.yaml
 ```
 
+## External validation on 3D Kinect models (example)
+We have provided a ready-to-run script to facilitate external validation of our Kinect3D pretrained models. These pretrained models are available in the `sample_data/model_zoo/kinect3d_models_to_share` folder. To run this external validation on your data, change the following variables in the `mmskeleton/configs/parkinsonism_prediction/kinect3D/eval/eval_external.yaml` file:
+
+- processor_cfg.resource_root
+- dataset_cfg.data_source.data_dir  (location of your input data, relative to the resource_root)
+- processor_cfg.compute_stats        (set to false if you do not have any labelled data)
+
+
+Then evaluation can be conducted with: 
+```
+python mmskeleton/mmskl.py mmskeleton/configs/parkinsonism_prediction/kinect3D/eval/eval_external.yaml 
+```
+
 # Training
 A simple training workflow is provided by this library, allowing for n-fold train/validation on one dataset, and testing on an external dataset. This training workflow requires two input data sources: 
 - One data source for the train/validation sets. During n-fold cross-validation, a different train/validation set will be used to train the model. 
