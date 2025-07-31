@@ -14,7 +14,7 @@ import time
 
 
 # When developing/testing, we can save time by only loading in a subset of the data
-fast_dev = True                    # Should be False to evaluate on entire dataset
+fast_dev = False                    # Should be False to evaluate on entire dataset
 num_walks_in_fast = 50
 
 
@@ -26,7 +26,7 @@ flip_loss_mult = False
 turn_off_weight_decay = False       # Keep as False to use the configuration from the YAML file
 log_incrementally = True
 log_code = False
-os.environ['WANDB_MODE'] = 'offline'
+os.environ['WANDB_MODE'] = 'online'
 
 
 def eval(
